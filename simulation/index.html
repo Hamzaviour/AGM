@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rider Delivery Simulation</title>
+  <meta name="description" content="3D simulation of seven agent architectures delivering an order from Cheezious, Johar Town to the University of Central Punjab.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%23e21b70'/><circle cx='32' cy='34' r='14' fill='white'/><circle cx='20' cy='20' r='7' fill='white'/><circle cx='44' cy='20' r='7' fill='white'/></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <div>
+        <h1>Smart Food Delivery Agent</h1>
+        <p>Cheezious, Johar Town &rarr; University of Central Punjab &middot; deadline 20 min (urgent 15)</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button id="btnInfo" class="ghost mobile-only">Details</button>
+      <button id="btnTable" class="ghost">Results<span class="wide-only"> table</span></button>
+      <button id="btnHelp" class="ghost"><span class="wide-only">How it works</span><span class="mobile-only">Help</span></button>
+    </div>
+  </header>
+
+  <aside id="controls" class="panel left">
+    <button class="collapse" data-target="controls" aria-label="Collapse controls">&minus;</button>
+    <h2>Simulation</h2>
+    <label class="field">Situation
+      <select id="scenario">
+        <option value="1">Test 1 &middot; Normal traffic, good weather</option>
+        <option value="2">Test 2 &middot; Heavy traffic, several routes</option>
+        <option value="3">Test 3 &middot; Heavy traffic, rain, urgent</option>
+        <option value="custom">Custom situation&hellip;</option>
+      </select>
+    </label>
+    <p id="story" class="story"></p>
+
+    <div id="customBox" class="custom" hidden>
+      <label class="field">Order time
+        <select id="cTime">
+          <option value="13:00">13:00 lunch</option>
+          <option value="18:10">18:10 evening rush</option>
+          <option value="22:30">22:30 night</option>
+        </select>
+      </label>
+      <label class="field">Rain
+        <select id="cRain">
+          <option value="0">No rain</option>
+          <option value="15">Raining for 15 min</option>
+          <option value="45">Raining for 45 min</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="cUrgent"> Urgent order (15-minute deadline)</label>
+      <table class="ctable">
+        <thead><tr><th></th><th>Jam</th><th>Closed</th><th>Flooded</th></tr></thead>
+        <tbody>
+          <tr><th class="ra">A</th><td><input type="checkbox" id="cAjam"></td><td><input type="checkbox" id="cAclosed"></td><td>&ndash;</td></tr>
+          <tr><th class="rb">B</th><td><input type="checkbox" id="cBjam"></td><td><input type="checkbox" id="cBclosed"></td><td><input type="checkbox" id="cBflood"></td></tr>
+          <tr><th class="rc">C</th><td><input type="checkbox" id="cCjam"></td><td><input type="checkbox" id="cCclosed"></td><td>&ndash;</td></tr>
+        </tbody>
+      </table>
+      <p class="hint">Flooding is the hidden truth: the rider app never reports it.</p>
+    </div>
+
+    <label class="field">Agent
+      <select id="agent"></select>
+    </label>
+    <p id="agentInfo" class="agent-info"></p>
+
+    <div class="row">
+      <button id="btnRun" class="primary">&#9654; Run delivery</button>
+      <button id="btnReset" class="ghost">Reset</button>
+    </div>
+
+    <div class="seg" id="speedSeg" role="group" aria-label="Playback speed">
+      <span>Speed</span>
+      <button data-speed="1" class="on">1&times;</button>
+      <button data-speed="2">2&times;</button>
+      <button data-speed="4">4&times;</button>
+      <button data-speed="8">8&times;</button>
+    </div>
+    <div class="seg" id="camSeg" role="group" aria-label="Camera">
+      <span>Camera</span>
+      <button data-cam="chase" class="on">Chase</button>
+      <button data-cam="top">Map</button>
+      <button data-cam="orbit">Orbit</button>
+    </div>
+    <label class="check"><input type="checkbox" id="tRoutes" checked> Show routes</label>
+    <label class="check"><input type="checkbox" id="tLabels" checked> Show labels</label>
+  </aside>
+
+  <aside id="info" class="panel right">
+    <button class="collapse" data-target="info" aria-label="Collapse details">&minus;</button>
+    <section>
+      <h3>Percept <small>what the rider can see</small></h3>
+      <div id="percept" class="percept"></div>
+    </section>
+    <section>
+      <h3>Reasoning</h3>
+      <ol id="reasoning" class="reasoning"></ol>
+    </section>
+    <section id="outcomeBox" hidden>
+      <h3>Outcome</h3>
+      <div id="outcome"></div>
+    </section>
+    <section id="raceBox" hidden>
+      <h3>Race: all 7 agents</h3>
+      <table id="race" class="race"></table>
+    </section>
+  </aside>
+
+  <div class="hud">
+    <div class="hud-row">
+      <div class="stat"><span>Clock</span><b id="hClock">--:--</b></div>
+      <div class="stat"><span>Elapsed</span><b id="hElapsed">0.0 min</b></div>
+      <div class="stat"><span>Speed</span><b id="hSpeed">0 km/h</b></div>
+      <div class="stat"><span>Deadline</span><b id="hDue">--:--</b></div>
+      <div class="stat wide"><span>Road</span><b id="hRoad">Waiting at Cheezious</b></div>
+    </div>
+    <div class="progress">
+      <div id="hBar" class="bar"></div>
+      <div id="hDeadline" class="deadline" title="20-minute deadline"></div>
+    </div>
+    <div id="hStatus" class="status">Choose a situation and an agent, then press Run delivery.</div>
+  </div>
+
+  <canvas id="minimap" width="260" height="170" aria-label="Map of the three routes"></canvas>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <dialog id="dlgTable">
+    <h2>Results: all agents, all tests</h2>
+    <p>Computed live by the same model as <code>code/main.py</code>. Cell = route and real delivery time (minutes).</p>
+    <div id="tableWrap"></div>
+    <form method="dialog"><button class="primary">Close</button></form>
+  </dialog>
+
+  <dialog id="dlgHelp">
+    <h2>How it works</h2>
+    <p>A foodpanda-style rider picks up an order at <b>Cheezious, Johar Town</b> and must hand it over at the
+      <b>University of Central Punjab</b> main gate within <b>20 minutes</b> (15 minutes for an urgent order). There are three routes:</p>
+    <ul>
+      <li><b class="ra">A</b> Khayaban-e-Jinnah Road: 3.00 km, 10.0 min, the shortest. Jams at the Jinnah signal chowk in rush hour.</li>
+      <li><b class="rb">B</b> Canal Bank Road: 3.25 km, 10.4 min. Fast, but its underpass floods after about 30 minutes of rain.</li>
+      <li><b class="rc">C</b> Johar Town inner streets: 4.20 km, 14.4 min. The longest route, but it rarely gets blocked.</li>
+    </ul>
+    <p>Each agent receives the same <b>percept</b>: the clock, the weather, live traffic from the rider app, and any closures it can see.
+      Underpass flooding is <i>not</i> in the percept. Only agents that keep a model of the world
+      (they remember how long it has rained) can expect it.</p>
+    <p>Choose <b>All agents (race)</b> to send all seven riders out at once and compare them.
+      One simulated minute takes 2 seconds at 1&times; speed. The map is schematic, not to scale.</p>
+    <p class="hint">Drag to orbit, scroll or pinch to zoom (Orbit camera). Keyboard: Space = run, 1/2/3 = test, C = camera.</p>
+    <form method="dialog"><button class="primary">Got it</button></form>
+  </dialog>
+
+  <div id="nogl" class="nogl" hidden>
+    <p>This simulation needs WebGL. Please open it in a recent Chrome, Edge or Firefox.</p>
+  </div>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="model.js"></script>
+  <script src="world.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
