@@ -947,7 +947,7 @@
     }
     return out;
   }
-  const ROUTE_COLORS = { A: 0x2f80ed, B: 0x27ae60, C: 0xf2994a };
+  const ROUTE_COLORS = { A: 0x2a78d6, B: 0x1baf7a, C: 0xeb6834 };
   function buildRouteOverlays(group) {
     const out = {};
     for (const r of ["A", "B", "C"]) {
@@ -969,9 +969,9 @@
   function buildLabels(group) {
     const labels = [];
     const add = (text, x, z, y, opts) => { const s = textSprite(text, opts); s.position.set(x, y, z); group.add(s); labels.push(s); return s; };
-    add("Route A  ·  Khayaban-e-Jinnah Rd", -60, 8, 14, { accent: "#2f80ed" });
-    add("Route B  ·  Canal Bank Rd", -40, -62, 14, { accent: "#27ae60" });
-    add("Route C  ·  Johar Town inner streets", 0, 103, 14, { accent: "#f2994a" });
+    add("Route A  ·  Khayaban-e-Jinnah Rd", -60, 8, 14, { accent: "#2a78d6" });
+    add("Route B  ·  Canal Bank Rd", -40, -62, 14, { accent: "#1baf7a" });
+    add("Route C  ·  Johar Town inner streets", 0, 103, 14, { accent: "#eb6834" });
     add("Jinnah signal chowk", 0, -14, 10, { scale: 0.045 });
     add("Canal underpass", 40, -55, 16, { scale: 0.045 });
     add("Lahore Canal", -200, -86, 6, { scale: 0.045, bg: "rgba(25,70,90,0.8)" });

@@ -9,6 +9,7 @@ The PDF is made with LibreOffice (soffice) if it is installed, otherwise with
 Microsoft Word through docx2pdf (pip install docx2pdf).
 """
 
+import inspect
 import json
 import os
 import shutil
@@ -35,8 +36,9 @@ MEMBERS = [("Ch Hamza Younas", "L1F23BSAI0089"), ("Rida", "L1F23BSAI0091"), ("Mu
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
 sys.path.insert(0, os.path.join(ROOT, "code"))
+import agents as agents_module  # noqa: E402
 from environment import (DEADLINE_MIN, ROUTES, ROUTE_IDS, SCENARIOS,  # noqa: E402
-                         base_minutes, make_percept, route_km)
+                         base_minutes, execute, make_percept, route_km)
 
 PINK = RGBColor(0xE2, 0x1B, 0x70)
 DIAG = os.path.join(ROOT, "diagrams")
@@ -72,6 +74,11 @@ def table(doc, header, rows, widths=None, highlight=None):
                 for r in p.runs:
                     r.font.size = Pt(9.5)
     if widths:
+        t.autofit = False
+        grid = t._tbl.tblGrid
+        for i, w in enumerate(widths):
+            t.columns[i].width = Cm(w)
+            grid.gridCol_lst[i].w = Cm(w)
         for row in t.rows:
             for i, w in enumerate(widths):
                 row.cells[i].width = Cm(w)
@@ -97,11 +104,39 @@ def bullets(doc, items):
         doc.add_paragraph(it, style="List Bullet")
 
 
-def code(doc, text):
+def code(doc, text, size=8.5):
+    """Monospaced block on a light grey background."""
     p = doc.add_paragraph()
-    r = p.add_run(text)
-    r.font.name = "Consolas"; r.font.size = Pt(8.5)
-    p.paragraph_format.left_indent = Cm(0.5)
+    r = p.add_run(text.rstrip("\n"))
+    r.font.name = "Consolas"; r.font.size = Pt(size)
+    r._element.rPr.rFonts.set(qn("w:eastAsia"), "Consolas")
+    pf = p.paragraph_format
+    pf.left_indent = Cm(0.3); pf.space_before = Pt(2); pf.space_after = Pt(8)
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear"); shd.set(qn("w:color"), "auto"); shd.set(qn("w:fill"), "F3F2EE")
+    p._p.get_or_add_pPr().append(shd)
+
+
+def run_snippet(cls, k):
+    """Python that runs one agent in one test situation, followed by its real output."""
+    sc = SCENARIOS[k]
+    agent = cls()
+    agent.reset()
+    route, why = agent.decide(make_percept(sc))
+    outcome = execute(route, sc)
+    lines = [
+        "# Test %d: %s" % (sc["id"], sc["title"]),
+        "scenario = SCENARIOS[%d]" % k,
+        "agent = %s()" % cls.__name__,
+        "route, why = agent.decide(make_percept(scenario))",
+        "outcome = execute(route, scenario)",
+        "",
+        "# output",
+        ">>> route",
+        repr(route),
+        ">>> print(*why, sep='\\n')",
+    ] + why + [">>> outcome", repr(outcome)]
+    return "\n".join(lines)
 
 
 def title_page(doc):
@@ -258,15 +293,38 @@ def build():
          "normal: A > B > C     rush hour: B > C > A     monsoon: C > A > B\nchoose the first open route in the policy",
          "Very quick decisions, but every context and its policy has to be designed in advance."),
     ]
+    classes = {c.key: c for c in agents_module.ALL_AGENTS}
     for key, title, img, desc, rules, note in designs:
+        cls = classes[key]
+        name = title.split(" ", 1)[1]
         doc.add_heading(title, 2)
         doc.add_paragraph(desc)
         code(doc, rules)
-        figure(doc, img, "Figure: %s architecture." % title.split(" ", 1)[1], width=14.5)
+        figure(doc, img, "Figure: %s architecture." % name, width=14.5)
         doc.add_paragraph(note)
-        lines = agents[key]["tests"][2]["reasoning"]
-        p = doc.add_paragraph(); p.add_run("Reasoning in Test 3: ").bold = True
-        p.add_run(" ".join(lines))
+
+        doc.add_heading("Python code", 3)
+        doc.add_paragraph("The complete class from code/agents.py:")
+        code(doc, inspect.getsource(cls), size=7.5)
+
+        doc.add_heading("Behaviour in each situation", 3)
+        doc.add_paragraph("Each snippet runs the agent on one test situation and shows its real output "
+                          "(decision, reasoning and the delivery result from the environment).")
+        for k in range(len(SCENARIOS)):
+            t = agents[key]["tests"][k]
+            p = doc.add_paragraph()
+            p.add_run("Test %d, %s: " % (SCENARIOS[k]["id"], SCENARIOS[k]["title"])).bold = True
+            r = p.add_run("route %s, %.1f min, %s." % (t["route"], t["minutes"],
+                          "on time" if t["on_time"] else "LATE by %.1f min" % (t["minutes"] - DEADLINE_MIN)))
+            r.font.color.rgb = RGBColor(0x0C, 0x83, 0x0C) if t["on_time"] else RGBColor(0xD0, 0x3B, 0x3B)
+            code(doc, run_snippet(cls, k), size=7.5)
+        figure(doc, "trace_%s.png" % key,
+               "Figure: %s agent, reasoning trace in the three situations (percept, every reasoning step, "
+               "decision, outcome)." % name, width=16.5)
+        if key == "utility_based":
+            figure(doc, "chart_utility.png", "Figure: utility of each route in each test. The agent rides the tallest bar.", width=16.5)
+        if key == "learning":
+            figure(doc, "chart_learning.png", "Figure: minutes the Learning agent learned for each route in each context.", width=16.5)
 
     # 5 -------------------------------------------------------------------
     doc.add_heading("5. Implementation", 1)
@@ -312,6 +370,28 @@ def build():
     table(doc, ["Agent", "Test 1", "Test 2", "Test 3", "On time", "Total min"], rows,
           widths=[3.8, 2.4, 2.4, 2.8, 1.8, 2.0], highlight=3)
     doc.add_paragraph("Cell = chosen route and real delivery time in minutes. Deadline: 20 minutes.")
+    figure(doc, "cmp_matrix.png", "Figure: the route each agent chose in each situation (colour = route).", width=15.5)
+
+    best = {1: ("A", 10.0), 2: ("B", 10.4), 3: ("C", 14.4)}
+    # the reasoning line that best explains each agent's choice
+    DECIDING_STEP = {"simple_reflex": 0, "model_based": -1, "goal_based": 1, "utility_based": -1,
+                     "learning": -1, "hierarchical": 1, "contextual": 1}
+    for k, sc in enumerate(SCENARIOS):
+        doc.add_heading("6.%d Test %d: %s" % (k + 1, sc["id"], sc["title"]), 2)
+        doc.add_paragraph(sc["story"] + " Best possible: route %s, %.1f min." % best[sc["id"]])
+        rows = []
+        for a in res["agents"]:
+            t = a["tests"][k]
+            margin = DEADLINE_MIN - t["minutes"]
+            rows.append([a["agent"], t["route"], "%.1f" % t["minutes"],
+                         "On time" if t["on_time"] else "LATE",
+                         ("%.1f spare" % margin) if margin >= 0 else ("%.1f late" % -margin),
+                         "%+.1f" % (t["minutes"] - best[sc["id"]][1]),
+                         t["reasoning"][DECIDING_STEP[a["key"]]]])
+        table(doc, ["Agent", "Route", "Min", "Result", "Margin", "vs best", "Deciding step"], rows,
+              widths=[2.7, 1.4, 1.2, 1.5, 2.1, 1.5, 6.2], highlight=3)
+
+    doc.add_heading("6.4 Summary of the three situations", 2)
     bullets(doc, [
         "Test 1: every agent takes A (10.0 min). With nothing unusual, all architectures are equal.",
         "Test 2: the jam on A is visible on the app. Every agent except Goal-Based switches to B (10.4 min). "
@@ -324,6 +404,32 @@ def build():
 
     # 7 -------------------------------------------------------------------
     doc.add_heading("7. Comparison and the most suitable agent", 1)
+    doc.add_heading("7.1 How the agents behaved differently", 2)
+    doc.add_paragraph(
+        "All seven agents received exactly the same percepts, so every difference below comes from the "
+        "architecture alone. Test 1 does not separate them: with nothing unusual, every agent takes the shortest "
+        "road A. Tests 2 and 3 show how each one reacts when something goes wrong.")
+    figure(doc, "cmp_times.png", "Figure: delivery time per agent and situation; bar colour = route chosen, dashed line = 20-minute deadline.", width=16.5)
+    bullets(doc, [
+        "Simple Reflex reacts only to what it sees right now. It avoids the visible jam on A in Test 2, "
+        "but in Test 3 its rule 'A closed, take B' sends the rider into the hidden flood (24.5 min, late).",
+        "Model-Based Reflex uses the same kind of rules, but it remembers that it has been raining for 45 minutes. "
+        "Its world model says the underpass floods after 30 minutes, so it picks C. Memory is the only difference from Simple Reflex, "
+        "and it decides Test 3.",
+        "Goal-Based plans a path to UCP on the map, but its cost is distance only. It ignores the jam in Test 2 "
+        "(19.2 min, on time by only 0.8 min) and the flood in Test 3 (late). Reaching the goal is not the same as reaching it well.",
+        "Utility-Based compares the expected outcome of every route. In Test 3 it gives B a utility of -42.5 "
+        "(85% chance of a 24.5-minute flooded trip) and C a utility of 71.2, so it picks C.",
+        "Learning makes the same choices as Utility-Based, but from experience: in its rain context, B averaged "
+        "24.5 min and C 14.3 min over the training trips. It would need new training if the roads changed.",
+        "Hierarchical splits the choice into layers. The strategic layer forbids congested and flood-prone roads, "
+        "so the tactical layer is left with only B in Test 2 (C is slower) and only C in Test 3.",
+        "Contextual recognises 'rush hour' and 'monsoon' and switches to the matching policy. It is right in "
+        "all three tests, but only because these contexts were designed in advance.",
+    ])
+    figure(doc, "cmp_summary.png", "Figure: on-time deliveries and total delivery time per agent.", width=16)
+
+    doc.add_heading("7.2 Feature comparison", 2)
     table(doc, ["Agent", "Handles hidden flood", "Handles traffic", "Needs training", "Design effort", "Explains its choice"], [
         ["Simple Reflex", "No", "Yes (visible jam)", "No", "Very low", "Rule that fired"],
         ["Model-Based Reflex", "Yes (rule)", "Yes", "No", "Low", "State + rule"],
@@ -334,7 +440,9 @@ def build():
         ["Contextual", "Yes (context)", "Yes", "No", "Medium", "Context + policy"],
     ], widths=[3.2, 3.0, 2.6, 2.4, 2.3, 3.1], highlight=3)
     doc.add_paragraph(
-        "Five agents deliver all three orders on time in 34.8 minutes in total, so the results alone do not decide. "
+        "Five agents deliver all three orders on time in 34.8 minutes in total, so the results alone do not decide.")
+    doc.add_heading("7.3 The most suitable agent", 2)
+    doc.add_paragraph(
         "We choose the Utility-Based agent as the most suitable for this problem, for these reasons:")
     bullets(doc, [
         "It deals with uncertainty directly. The flood cannot be observed, and the agent reasons with P(flood) "

@@ -25,7 +25,7 @@ The three destinations (routes) from Cheezious to UCP:
 | `report/` | The report as Word (`.docx`) and PDF |
 | `code/` | Python code: `environment.py`, `agents.py`, `main.py` |
 | `results/` | Program output for the three test cases (`.txt` and `.json`) |
-| `diagrams/` | Architecture diagram for each agent, the route map, and simulation screenshots (PNG) |
+| `diagrams/` | Architecture diagram and reasoning trace for each agent, result charts, the route map, and simulation screenshots (PNG) |
 | `simulation/` | Interactive 3D simulation; open `index.html` |
 | `tools/` | Scripts that rebuild the diagrams and report, and check that the simulation matches the Python code |
 
@@ -87,6 +87,7 @@ Most suitable: the **Utility-Based Agent** (see Section 7 of the report).
 python code/main.py
 node tools/check_parity.js
 python tools/export_diagrams.py   # needs matplotlib
+python tools/export_charts.py     # result charts + reasoning traces, needs matplotlib
 python tools/build_report.py      # needs python-docx, Pillow; PDF via LibreOffice or Microsoft Word
 ```
 
