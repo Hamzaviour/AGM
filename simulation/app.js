@@ -14,8 +14,8 @@
     goal_based: "Searches the road map for the shortest path that reaches UCP. Ignores traffic and weather.",
     utility_based: "Weighs on-time probability, expected minutes and flood risk; picks the highest expected utility.",
     learning: "Learned how long each route takes in each context from 54 training trips (Q-values).",
-    hierarchical: "Strategic layer sets constraints, tactical layer picks the route, operational layer rides.",
     contextual: "Recognises the context (normal, rush hour, monsoon) and switches to that context's policy.",
+    hierarchical: "Strategic layer sets subgoals, tactical layer picks a route that meets them, operational layer rides.",
   };
   const RACE_COLORS = [0xff595e, 0xffca3a, 0x8ac926, 0x1982c4, 0xe21b70, 0x6a4c93, 0x00c2c7];
   const hex = (c) => "#" + c.toString(16).padStart(6, "0");
@@ -74,6 +74,7 @@
       story: "Your own mix of time, rain, jams, closures and flooding.",
       order_time: time, weather: rain ? "rain" : "clear",
       rain_since: rain ? DM.toClock(DM.fromClock(time) - rain) : null,
+      deadline: $("cUrgent").checked ? DM.URGENT_DEADLINE_MIN : DM.DEADLINE_MIN,
       state: { A: st("A"), B: st("B"), C: st("C") },
     };
   }
@@ -292,6 +293,7 @@
       <dt>Weather</dt><dd>${p.weather === "rain" ? "Raining" + (rainMin ? ` (for ${rainMin} min)` : "") : "Clear"}</dd>
       <dt>Traffic app</dt><dd>${traffic}</dd>
       <dt>Closures</dt><dd>${closed.length ? closed.map((r) => chip(r + " closed", "closed")).join("") : "none seen"}</dd>
+      <dt>Order</dt><dd>${p.priority === "urgent" ? chip("urgent", "heavy") : "normal"}</dd>
       <dt>Deadline</dt><dd>${p.deadline} min, by ${DM.toClock(DM.fromClock(p.time) + p.deadline)}</dd>
       <dt>Memory</dt><dd style="font-size:12px;color:var(--muted)">${hist}</dd>
       <div class="hidden-truth">${hiddenFlood}</div></dl>`;
@@ -328,7 +330,7 @@
       box.innerHTML = `<div class="outcome-card"><div class="badge late">&times;</div><div><b>Not delivered</b><p>${o.note}</p></div></div>`;
     } else {
       const arrive = DM.toClock(Math.round(DM.fromClock(S.scenario.order_time) + o.minutes));
-      const diff = o.minutes - DM.DEADLINE_MIN;
+      const diff = o.minutes - DM.deadlineOf(S.scenario);
       box.innerHTML = `<div class="outcome-card"><div class="badge ${o.on_time ? "ok" : "late"}">${o.on_time ? "&#10003;" : "!"}</div>
         <div><b>Route ${o.route} &middot; ${o.minutes.toFixed(1)} min &middot; ${o.on_time ? "on time" : "LATE by " + diff.toFixed(1) + " min"}</b>
         <p>Handed over at about ${arrive}. ${o.note.charAt(0).toUpperCase() + o.note.slice(1)}.</p></div></div>`;
@@ -354,7 +356,7 @@
     $("btnRun").disabled = false;
     $("btnRun").innerHTML = "&#9654; Run delivery";
     $("hClock").textContent = S.scenario.order_time;
-    $("hDue").textContent = DM.toClock(DM.fromClock(S.scenario.order_time) + DM.DEADLINE_MIN);
+    $("hDue").textContent = DM.toClock(DM.fromClock(S.scenario.order_time) + DM.deadlineOf(S.scenario));
     $("hElapsed").textContent = "0.0 min";
     $("hSpeed").textContent = "0 km/h";
     $("hRoad").textContent = "Waiting at Cheezious";
@@ -367,9 +369,11 @@
   }
 
   function updateDeadlineMarker() {
-    const maxMin = Math.max(DM.DEADLINE_MIN + 6, ...S.riders.filter((r) => r.timeline).map((r) => r.timeline.total + 1));
+    const due = DM.deadlineOf(S.scenario);
+    const maxMin = Math.max(due + 6, ...S.riders.filter((r) => r.timeline).map((r) => r.timeline.total + 1));
     S.scaleMax = maxMin;
-    $("hDeadline").style.left = (DM.DEADLINE_MIN / maxMin * 100) + "%";
+    $("hDeadline").style.left = (due / maxMin * 100) + "%";
+    $("hDeadline").title = due + "-minute deadline";
   }
 
   function highlightRoutes(route) {
@@ -695,13 +699,13 @@
         if (!f.arrived) {
           setStatus(f.zone === "jam" ? "Crawling through the jam at Jinnah signal chowk…"
             : f.zone === "flood" ? "Underpass flooded! Pushing the bike through knee-deep water…"
-            : shownMin > DM.DEADLINE_MIN ? "Past the 20-minute deadline…"
+            : shownMin > DM.deadlineOf(S.scenario) ? "Past the " + DM.deadlineOf(S.scenario) + "-minute deadline…"
             : S.race ? "Riders on the road. Click a row in the race table to follow that rider."
             : "Riding route " + f.route + " · " + DM.ROUTES[f.route].name);
         }
       }
       $("hBar").style.width = Math.min(100, shownMin / S.scaleMax * 100) + "%";
-      $("hBar").classList.toggle("late", shownMin > DM.DEADLINE_MIN);
+      $("hBar").classList.toggle("late", shownMin > DM.deadlineOf(S.scenario));
       if (S.race && Math.floor(S.simMin * 2) !== S.lastRaceTick) { S.lastRaceTick = Math.floor(S.simMin * 2); renderRace(); }
       if (allDone && S.riders.every((r) => !r.bag || r.bag.userData.t >= 1)) finish();
     }

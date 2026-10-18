@@ -12,7 +12,7 @@ import os
 import sys
 
 from agents import ALL_AGENTS
-from environment import (CUSTOMER, DEADLINE_MIN, RESTAURANT, ROUTE_IDS, ROUTES,
+from environment import (CUSTOMER, DEADLINE_MIN, RESTAURANT, ROUTE_IDS, ROUTES, deadline_of,
                          SCENARIOS, base_minutes, execute, make_percept, route_km)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -47,7 +47,7 @@ def report(rows, details=False):
     out = []
     w = out.append
     w("SMART FOOD DELIVERY AGENT - %s -> %s" % (RESTAURANT, CUSTOMER))
-    w("Deadline: %.0f minutes from pickup" % DEADLINE_MIN)
+    w("Deadline: %.0f minutes from pickup (urgent orders: 15 minutes)" % DEADLINE_MIN)
     w("")
     w("Routes")
     for r in ROUTE_IDS:
@@ -55,7 +55,7 @@ def report(rows, details=False):
     w("")
     w("Test situations")
     for sc in SCENARIOS:
-        w("  Test %d  %-18s %s" % (sc["id"], sc["title"], sc["story"]))
+        w("  Test %d  %-30s deadline %2.0f min. %s" % (sc["id"], sc["title"], deadline_of(sc), sc["story"]))
     w("")
     header = "%-20s | %-15s | %-15s | %-15s | %-7s | %s" % (
         "Agent", "Test 1", "Test 2", "Test 3", "On time", "Total min")
@@ -90,7 +90,8 @@ def main():
         f.write(report(rows, details=True) + "\n")
     with open(os.path.join(RESULTS, "results.json"), "w", encoding="utf-8") as f:
         json.dump({"deadline": DEADLINE_MIN,
-                   "scenarios": [{"id": s["id"], "title": s["title"], "story": s["story"]} for s in SCENARIOS],
+                   "scenarios": [{"id": s["id"], "title": s["title"], "story": s["story"],
+                                  "deadline": deadline_of(s)} for s in SCENARIOS],
                    "agents": rows}, f, indent=2)
 
 

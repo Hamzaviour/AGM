@@ -3,18 +3,21 @@
   "scenarios": [
     {
       "id": 1,
-      "title": "Normal lunch hour",
-      "story": "Clear sky at 1 pm. All three roads are moving normally."
+      "title": "Normal traffic, good weather",
+      "story": "Clear sky at 1 pm. All three roads are moving normally.",
+      "deadline": 20.0
     },
     {
       "id": 2,
-      "title": "Evening rush hour",
-      "story": "6:10 pm. Office traffic has jammed the Jinnah signal chowk on Khayaban-e-Jinnah. The other roads are clear."
+      "title": "Heavy traffic, several routes",
+      "story": "6:10 pm rush hour. Khayaban-e-Jinnah is jammed at the Jinnah signal chowk and the inner streets are also heavy. All three routes are open.",
+      "deadline": 20.0
     },
     {
       "id": 3,
-      "title": "Monsoon rain",
-      "story": "It has rained since 12:15. A fallen tree has closed Khayaban-e-Jinnah and the Canal underpass is under water, which the traffic app does not show."
+      "title": "Heavy traffic, rain, urgent",
+      "story": "It has rained since 12:15 and Khayaban-e-Jinnah is jammed. The order is urgent: it must reach UCP in 15 minutes. The Canal underpass is under water, which the traffic app does not show.",
+      "deadline": 15.0
     }
   ],
   "agents": [
@@ -51,7 +54,7 @@
           "on_time": false,
           "note": "waded through flooded underpass",
           "reasoning": [
-            "Rule fired: IF Khayaban-e-Jinnah is closed THEN take route B.",
+            "Rule fired: IF Khayaban-e-Jinnah is jammed THEN take route B.",
             "No memory: earlier percepts are ignored."
           ]
         }
@@ -130,19 +133,19 @@
         },
         {
           "test": 3,
-          "route": "B",
-          "minutes": 24.5,
+          "route": "A",
+          "minutes": 19.2,
           "on_time": false,
-          "note": "waded through flooded underpass",
+          "note": "stuck in traffic at signal chowk queue",
           "reasoning": [
-            "Goal: reach UCP. Closed roads removed from the map: A.",
-            "Uniform-cost search found CHZ -> B1 -> B2 -> UCP (3.25 km) on route B.",
+            "Goal: reach UCP. Closed roads removed from the map: none.",
+            "Uniform-cost search found CHZ -> A1 -> UCP (3.00 km) on route A.",
             "Traffic and weather are not part of the goal test, so they are ignored."
           ]
         }
       ],
       "on_time": 2,
-      "total_minutes": 53.7
+      "total_minutes": 48.4
     },
     {
       "agent": "Utility-Based",
@@ -172,7 +175,7 @@
             "U = 100*P(on time) - 2*E[minutes] - 15*P(flood)",
             "Route A: E[t]=19.2 min, P(on time)=1.00, U=61.6",
             "Route B: E[t]=10.4 min, P(on time)=1.00, U=79.2",
-            "Route C: E[t]=14.4 min, P(on time)=1.00, U=71.2",
+            "Route C: E[t]=17.4 min, P(on time)=1.00, U=65.2",
             "Highest utility -> route B."
           ]
         },
@@ -184,6 +187,7 @@
           "note": "smooth ride",
           "reasoning": [
             "U = 100*P(on time) - 2*E[minutes] - 15*P(flood)",
+            "Route A: E[t]=19.2 min, P(on time)=0.00, U=-38.4",
             "Route B: E[t]=22.4 min, P(on time)=0.15, U=-42.5",
             "Route C: E[t]=14.4 min, P(on time)=1.00, U=71.2",
             "Highest utility -> route C."
@@ -233,6 +237,7 @@
           "note": "smooth ride",
           "reasoning": [
             "Context recognised: rain. Learned from 54 training trips.",
+            "Q(rain, A) = -19.2  (about 19.2 min)",
             "Q(rain, B) = -24.5  (about 24.5 min)",
             "Q(rain, C) = -14.3  (about 14.3 min)",
             "Exploit best learned value -> route C."
@@ -253,9 +258,9 @@
           "on_time": true,
           "note": "smooth ride",
           "reasoning": [
-            "Strategic layer: mode=fast, avoid congestion=True, avoid flood-prone=False.",
-            "Tactical layer: allowed routes A, B, C, fastest of them is A.",
-            "Operational layer: limit speed to 18 km/h on bad patches, stop at red signals, keep the food box level."
+            "Strategic layer, subgoals: arrive within 20 min (normal order), avoid congestion, flood risk low.",
+            "Tactical layer: routes meeting the subgoals: A, B, C; fastest is A.",
+            "Operational layer: limit speed to 18 km/h on wet patches, stop at red signals, keep the food box level."
           ]
         },
         {
@@ -265,9 +270,9 @@
           "on_time": true,
           "note": "smooth ride",
           "reasoning": [
-            "Strategic layer: mode=fast, avoid congestion=True, avoid flood-prone=False.",
-            "Tactical layer: allowed routes B, C, fastest of them is B.",
-            "Operational layer: limit speed to 19 km/h on bad patches, stop at red signals, keep the food box level."
+            "Strategic layer, subgoals: arrive within 20 min (normal order), avoid congestion, flood risk low.",
+            "Tactical layer: routes meeting the subgoals: B; fastest is B.",
+            "Operational layer: limit speed to 19 km/h on wet patches, stop at red signals, keep the food box level."
           ]
         },
         {
@@ -277,9 +282,9 @@
           "on_time": true,
           "note": "smooth ride",
           "reasoning": [
-            "Strategic layer: mode=safe, avoid congestion=True, avoid flood-prone=True.",
-            "Tactical layer: allowed routes C, fastest of them is C.",
-            "Operational layer: limit speed to 14 km/h on bad patches, stop at red signals, keep the food box level."
+            "Strategic layer, subgoals: arrive within 15 min (urgent order), avoid congestion, avoid flood-prone roads.",
+            "Tactical layer: routes meeting the subgoals: C; fastest is C.",
+            "Operational layer: limit speed to 14 km/h on wet patches, stop at red signals, keep the food box level."
           ]
         }
       ],

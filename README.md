@@ -8,7 +8,7 @@ Agent Based Modeling, Assignment 1 (group). University of Central Punjab.
 | Rida | L1F23BSAI0091 |
 | Muhammad Abdullah | L1F23BSAI0063 |
 
-A foodpanda-style rider picks up an order at **Cheezious, Johar Town** and must hand it over at the **University of Central Punjab (UCP)** main gate within 20 minutes. Seven single-agent architectures solve the same delivery problem: Simple Reflex, Model-Based Reflex, Goal-Based, Utility-Based, Learning, Hierarchical and Contextual.
+A foodpanda-style rider picks up an order at **Cheezious, Johar Town** and must hand it over at the **University of Central Punjab (UCP)** main gate within 20 minutes (15 minutes for an urgent order). Seven single-agent architectures solve the same delivery problem: Simple Reflex, Model-Based Reflex, Goal-Based, Utility-Based, Learning, Hierarchical and Contextual.
 
 The three destinations (routes) from Cheezious to UCP:
 
@@ -22,8 +22,8 @@ The three destinations (routes) from Cheezious to UCP:
 
 | Folder | Contents |
 |---|---|
-| `report/` | The report as Word (`.docx`) and PDF |
-| `code/` | Python code: `environment.py`, `agents.py`, `main.py` |
+| `report/` | The report as Word (`.docx`) and PDF, with the cover page and UCP logo in `report/assets/` |
+| `code/` | Python code: `environment.py`, `agents.py` (all seven agents), `main.py` |
 | `results/` | Program output for the three test cases (`.txt` and `.json`) |
 | `diagrams/` | Architecture diagram and reasoning trace for each agent, result charts, the route map, and simulation screenshots (PNG) |
 | `simulation/` | Interactive 3D simulation; open `index.html` |
@@ -71,13 +71,17 @@ vercel --prod
 |---|---|---|---|---|
 | Simple Reflex | A 10.0 | B 10.4 | B 24.5 (late) | 2/3 |
 | Model-Based Reflex | A 10.0 | B 10.4 | C 14.4 | 3/3 |
-| Goal-Based | A 10.0 | A 19.2 | B 24.5 (late) | 2/3 |
+| Goal-Based | A 10.0 | A 19.2 | A 19.2 (late) | 2/3 |
 | Utility-Based | A 10.0 | B 10.4 | C 14.4 | 3/3 |
 | Learning | A 10.0 | B 10.4 | C 14.4 | 3/3 |
 | Hierarchical | A 10.0 | B 10.4 | C 14.4 | 3/3 |
 | Contextual | A 10.0 | B 10.4 | C 14.4 | 3/3 |
 
-Test 1: normal lunch hour. Test 2: evening rush hour, with A jammed. Test 3: monsoon rain; A is closed by a fallen tree and the B underpass is flooded.
+The three test situations from the brief:
+
+1. **Normal traffic and good weather** (deadline 20 min).
+2. **Heavy traffic with multiple available routes**: A jammed, C heavy, B clear; all routes open (deadline 20 min).
+3. **Heavy traffic, rain and an urgent delivery**: rain for 45 min, A jammed, the B underpass flooded (not visible to the rider), urgent deadline of 15 min.
 
 Most suitable: the **Utility-Based Agent** (see Section 7 of the report).
 
@@ -91,4 +95,4 @@ python tools/export_charts.py     # result charts + reasoning traces, needs matp
 python tools/build_report.py      # needs python-docx, Pillow; PDF via LibreOffice or Microsoft Word
 ```
 
-To fill in the section and instructor name on the title page, edit `TITLE_INFO` at the top of `tools/build_report.py` and run it again, or edit the Word file directly.
+Section (AG2), instructor and date are set in `TITLE_INFO` at the top of `tools/build_report.py`. The cover image is `report/assets/cover.png`.

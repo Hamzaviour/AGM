@@ -7,7 +7,7 @@ return one route: "A", "B" or "C", together with the reasoning it used.
 
 import heapq
 
-from environment import (ROUTES, ROUTE_IDS, EDGES, DEADLINE_MIN, FLOOD_RAIN_MIN,
+from environment import (ROUTES, ROUTE_IDS, EDGES, FLOOD_RAIN_MIN,
                          TRAINING_DAYS, Noise, base_minutes, is_rush, rain_minutes,
                          trip_minutes)
 
@@ -151,7 +151,7 @@ class UtilityBasedAgent(Agent):
     def utility(self, route, percept):
         outs, risk = self.outcomes(route, percept)
         expected = sum(p * t for p, t in outs)
-        p_on_time = sum(p for p, t in outs if t <= DEADLINE_MIN)
+        p_on_time = sum(p for p, t in outs if t <= percept["deadline"])
         u = self.W_ON_TIME * p_on_time - self.W_TIME * expected - self.W_RISK * risk
         return round(u, 2), round(expected, 2), round(p_on_time, 2)
 
@@ -225,7 +225,8 @@ class LearningAgent(Agent):
 
 
 # ---------------------------------------------------------------------------
-# 6. Hierarchical: strategic -> tactical -> operational layers.
+# 6. Hierarchical: the strategic layer sets subgoals, the tactical layer picks
+#    a route that meets them, the operational layer rides it.
 # ---------------------------------------------------------------------------
 class HierarchicalAgent(Agent):
     name = "Hierarchical"
@@ -233,35 +234,40 @@ class HierarchicalAgent(Agent):
 
     def strategic(self, percept):
         rain = rain_minutes(percept)
-        return {"avoid_congestion": True,
+        return {"deadline": percept["deadline"],
+                "priority": percept["priority"],
+                "avoid_congestion": True,
                 "avoid_flood_prone": rain >= FLOOD_RAIN_MIN,
-                "mode": "safe" if percept["weather"] == "rain" else "fast"}
+                "wet": percept["weather"] == "rain"}
 
-    def tactical(self, percept, plan):
+    def tactical(self, percept, subgoals):
         candidates = []
         for r in open_routes(percept):
-            if plan["avoid_congestion"] and percept["traffic"][r] == "heavy":
+            if subgoals["avoid_congestion"] and percept["traffic"][r] == "heavy":
                 continue
-            if plan["avoid_flood_prone"] and ROUTES[r]["flood_delay"] > 0:
+            if subgoals["avoid_flood_prone"] and ROUTES[r]["flood_delay"] > 0:
+                continue
+            if base_minutes(r) > subgoals["deadline"]:
                 continue
             candidates.append(r)
         if not candidates:
             candidates = open_routes(percept)
         return min(candidates, key=base_minutes), candidates
 
-    def operational(self, route, plan):
-        speed = ROUTES[route]["speed_kmh"] * (0.8 if plan["mode"] == "safe" else 1.0)
-        return "limit speed to %.0f km/h on bad patches, stop at red signals, keep the food box level" % speed
+    def operational(self, route, subgoals):
+        speed = ROUTES[route]["speed_kmh"] * (0.8 if subgoals["wet"] else 1.0)
+        return "limit speed to %.0f km/h on wet patches, stop at red signals, keep the food box level" % speed
 
     def decide(self, percept):
-        plan = self.strategic(percept)
-        route, candidates = self.tactical(percept, plan)
+        sub = self.strategic(percept)
+        route, candidates = self.tactical(percept, sub)
         return route, [
-            "Strategic layer: mode=%s, avoid congestion=%s, avoid flood-prone=%s."
-            % (plan["mode"], plan["avoid_congestion"], plan["avoid_flood_prone"]),
-            "Tactical layer: allowed routes %s, fastest of them is %s."
+            "Strategic layer, subgoals: arrive within %.0f min (%s order), avoid congestion, %s."
+            % (sub["deadline"], sub["priority"],
+               "avoid flood-prone roads" if sub["avoid_flood_prone"] else "flood risk low"),
+            "Tactical layer: routes meeting the subgoals: %s; fastest is %s."
             % (", ".join(candidates), route),
-            "Operational layer: %s." % self.operational(route, plan),
+            "Operational layer: %s." % self.operational(route, sub),
         ]
 
 

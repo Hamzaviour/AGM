@@ -18,6 +18,7 @@ import sys
 
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.section import WD_SECTION
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -27,8 +28,8 @@ from docx.shared import Cm, Pt, RGBColor
 TITLE_INFO = {
     "course": "Agent Based Modeling",
     "assignment": "Assignment 1 (group)",
-    "section": "____________",
-    "instructor": "____________",
+    "section": "AG2",
+    "instructor": "Zishan Hussain Chuhan",
     "date": "October 2026",
 }
 MEMBERS = [("Ch Hamza Younas", "L1F23BSAI0089"), ("Rida", "L1F23BSAI0091"), ("Muhammad Abdullah", "L1F23BSAI0063")]
@@ -38,7 +39,7 @@ ROOT = os.path.join(HERE, "..")
 sys.path.insert(0, os.path.join(ROOT, "code"))
 import agents as agents_module  # noqa: E402
 from environment import (DEADLINE_MIN, ROUTES, ROUTE_IDS, SCENARIOS,  # noqa: E402
-                         base_minutes, make_percept, route_km)
+                         URGENT_DEADLINE_MIN, base_minutes, deadline_of, make_percept, route_km)
 
 PINK = RGBColor(0xE2, 0x1B, 0x70)
 DIAG = os.path.join(ROOT, "diagrams")
@@ -159,10 +160,23 @@ def build():
     st = doc.styles["Normal"]; st.font.name = "Calibri"; st.font.size = Pt(11)
     for s in ("Heading 1", "Heading 2", "Heading 3"):
         doc.styles[s].font.color.rgb = PINK
+    # page 1: the cover image, edge to edge
     sec = doc.sections[0]
     sec.page_width, sec.page_height = Cm(21.0), Cm(29.7)   # A4
+    cover = os.path.join(OUT_DIR, "assets", "cover.png")
+    if os.path.exists(cover):
+        for side in ("left_margin", "right_margin", "top_margin", "bottom_margin", "header_distance", "footer_distance"):
+            setattr(sec, side, Cm(0))
+        p = doc.paragraphs[0] if doc.paragraphs else doc.add_paragraph()
+        pf = p.paragraph_format
+        pf.space_before = pf.space_after = Pt(0)
+        pf.line_spacing = 1.0
+        p.add_run().add_picture(cover, width=Cm(20.99), height=Cm(29.69))
+        sec = doc.add_section(WD_SECTION.NEW_PAGE)
+    sec.page_width, sec.page_height = Cm(21.0), Cm(29.7)
     sec.left_margin = sec.right_margin = Cm(2.2)
     sec.top_margin = sec.bottom_margin = Cm(2.0)
+    sec.header_distance = sec.footer_distance = Cm(1.25)
 
     doc.core_properties.author = ", ".join(n for n, _ in MEMBERS)
     doc.core_properties.title = "Smart Food Delivery Agent"
@@ -175,12 +189,22 @@ def build():
         "restaurant to the customer. The fastest road depends on the time of day, the weather and things the "
         "rider cannot see from the restaurant door. This report models one such rider as an intelligent agent. "
         "An order is picked up at Cheezious, Johar Town and must be handed over at the main gate of the "
-        "University of Central Punjab (UCP), Khayaban-e-Jinnah, within %d minutes." % DEADLINE_MIN)
+        "University of Central Punjab (UCP), Khayaban-e-Jinnah, within %d minutes (%d minutes for an urgent "
+        "order)." % (DEADLINE_MIN, URGENT_DEADLINE_MIN))
     doc.add_paragraph(
         "The same delivery problem is solved by seven single-agent architectures: Simple Reflex, Model-Based "
         "Reflex, Goal-Based, Utility-Based, Learning, Hierarchical and Contextual. Every agent receives exactly "
         "the same percept and is tested in the same three situations. A Python program produces the results, "
         "and an interactive 3D simulation shows each delivery as a rider riding through a model of Johar Town.")
+
+    doc.add_heading("1.1 Assignment deliverables", 2)
+    table(doc, ["Deliverable", "Where in this submission"], [
+        ["Implementation/code for every agent type", "code/agents.py (one class per agent); the full class is printed in each part of Section 4"],
+        ["One architecture diagram for each agent type", "Section 4: Input / Perception -> Decision Process -> Action -> Environment, plus the agent's own component (internal state, goal, utility, learning/feedback, subgoals, context)"],
+        ["Outputs/results for the three common test cases", "Section 6 and results/results.txt / results.json"],
+        ["Comparison of how the agents behaved differently", "Section 7.1 and 7.2, with charts"],
+        ["Conclusion: most suitable agent and why", "Section 7.3 and Section 8 (Utility-Based agent)"],
+    ], widths=[5.4, 11.2])
 
     # 2 -------------------------------------------------------------------
     doc.add_heading("2. The Environment", 1)
@@ -188,7 +212,7 @@ def build():
     doc.add_paragraph("There are three ways from Cheezious to UCP. Destinations A, B and C are the three routes:")
     table(doc, ["Route", "Road", "Distance", "Free-flow time", "Main risk"],
           [[r, ROUTES[r]["name"], "%.2f km" % route_km(r), "%.1f min" % base_minutes(r),
-            {"A": "Jams at the Jinnah signal chowk in rush hour",
+            {"A": "Jams at the Jinnah signal chowk in heavy traffic",
              "B": "The Canal underpass floods after about 30 minutes of rain",
              "C": "Longest route, but rarely blocked"}[r]] for r in ROUTE_IDS],
           widths=[1.4, 4.5, 2.0, 2.4, 6.3])
@@ -202,7 +226,7 @@ def build():
 
     doc.add_heading("2.2 PEAS description", 2)
     table(doc, ["", "Description"], [
-        ["Performance", "Order handed over within 20 minutes; shortest delivery time; avoid unsafe (flooded) roads; arrive at all (do not choose a closed road)."],
+        ["Performance", "Order handed over within the deadline (20 minutes, 15 for an urgent order); shortest delivery time; avoid unsafe (flooded) roads; never choose a closed road."],
         ["Environment", "Johar Town roads between Cheezious and UCP: routes A, B, C, traffic, rain, road closures, underpass flooding, time of day."],
         ["Actuators", "Motorbike controls: choose and ride route A, B or C; speed and braking (used by the Hierarchical agent's operational layer)."],
         ["Sensors", "Eyes (closures and traffic right outside the restaurant, weather), the rider app (clock, live traffic on all routes, reported closures), memory of earlier percepts."],
@@ -227,19 +251,31 @@ def build():
     # 3 -------------------------------------------------------------------
     doc.add_heading("3. Test situations", 1)
     table(doc, ["Test", "Situation", "Order time", "What is true", "What the rider can see"], [
-        ["1", "Normal lunch hour", "13:00", "All roads clear", "Everything"],
-        ["2", "Evening rush hour", "18:10", "A jammed at Jinnah chowk (+9.2 min)", "A heavy on the traffic app"],
-        ["3", "Monsoon rain", "13:00", "Rain since 12:15; A closed by a fallen tree; B underpass flooded (+14.1 min)", "Rain, A closed. Flooding is NOT visible"],
-    ], widths=[1.2, 3.2, 2.0, 5.4, 4.8])
-    doc.add_paragraph("The best possible choice is A (10.0 min) in Test 1, B (10.4 min) in Test 2 and C (14.4 min) in Test 3.")
+        ["1", "Normal traffic and good weather", "13:00, 20 min", "All roads clear, no rain", "Everything"],
+        ["2", "Heavy traffic with multiple available routes", "18:10, 20 min",
+         "A jammed at Jinnah chowk (+9.2 min), C heavy (+3.0 min), B clear; all three routes open", "Traffic on all routes (app)"],
+        ["3", "Heavy traffic, rain and an urgent delivery", "13:00, 15 min (urgent)",
+         "Rain since 12:15; A jammed (+9.2 min); B underpass flooded (+14.1 min); C clear",
+         "Rain, A jammed, urgent order. Flooding is NOT visible"],
+    ], widths=[1.1, 3.6, 2.4, 5.2, 4.3])
+    doc.add_paragraph("All seven agents are tested on exactly these three situations, which follow the assignment brief. "
+                      "The best possible choice is A (10.0 min) in Test 1, B (10.4 min) in Test 2 and C (14.4 min, "
+                      "inside the 15-minute urgent deadline) in Test 3.")
 
     # 4 -------------------------------------------------------------------
     doc.add_heading("4. Agent designs", 1)
+    doc.add_paragraph(
+        "Every architecture diagram uses the same basic structure, so the agents are easy to compare: "
+        "Input / Perception -> Decision Process -> Action -> Environment, with a dashed feedback loop from the "
+        "environment back to the next percept. On top of that, each diagram shows the component that makes the "
+        "architecture different: condition-action rules, internal state and world model, goal, utility, "
+        "learning element and critic (feedback), strategic subgoals, or context classifier and policies.")
     designs = [
         ("simple_reflex", "4.1 Simple Reflex Agent", "1_simple_reflex.png",
          "Uses condition-action rules on the current percept only. It has no memory and no model of the world.",
          "IF A is closed THEN take B\nIF A is jammed THEN take B\nOTHERWISE take A",
-         "Fast and simple. In Test 3 it cannot know that the underpass is flooded, so it sends the rider into the water."),
+         "Fast and simple. In Test 3 it sees the jam on A and switches to B, but it cannot know that the underpass "
+         "is flooded, so it sends the rider into the water."),
         ("model_based", "4.2 Model-Based Reflex Agent", "2_model_based_reflex.png",
          "Keeps an internal state that it updates from the percept history, using a model of how the world works: "
          "the Canal underpass floods after 30 minutes of continuous rain.",
@@ -251,7 +287,7 @@ def build():
          "distance as the cost. Closed roads are removed from the graph.",
          "graph = road map without closed roads\npath = uniform_cost_search(graph, CHZ, UCP)\nride the route of path",
          "Always reaches the goal by the shortest road, but the goal test does not care about traffic or weather. "
-         "This costs time in Test 2 and makes it late in Test 3."),
+         "It takes the jammed road A in Tests 2 and 3: on time for the 20-minute deadline, but late for the urgent 15-minute order."),
         ("utility_based", "4.4 Utility-Based Agent", "4_utility_based.png",
          "Predicts the possible outcomes of each route with probabilities, for example P(flood) = 0.85 after more "
          "than 30 minutes of rain, and scores them with a utility function:",
@@ -264,10 +300,11 @@ def build():
          "Q(ctx, r) <- Q(ctx, r) + (reward - Q(ctx, r)) / n      reward = -minutes\nat test time: choose argmax_r Q(ctx, r) among open routes",
          "Needs no hand-written rules, but it needs training data that covers each context."),
         ("hierarchical", "4.6 Hierarchical Agent", "6_hierarchical.png",
-         "Splits the problem into three layers. The strategic layer sets the mode (fast or safe) and constraints "
-         "(avoid congestion, avoid flood-prone roads after 30 minutes of rain). The tactical layer picks the fastest "
-         "route that meets the constraints. The operational layer controls riding (speed limit, signals).",
-         "constraints = strategic(percept)\nroute = fastest route that satisfies constraints\noperational(route): ride it",
+         "Splits the problem into three layers. The strategic layer turns the order into subgoals: arrive within "
+         "the deadline (15 minutes if urgent), avoid congestion, and avoid flood-prone roads after 30 minutes of rain. "
+         "The tactical layer picks the fastest route that meets all subgoals. The operational layer rides it "
+         "(speed limit on wet patches, signals).",
+         "subgoals = strategic(percept)\nroute = fastest route that meets every subgoal\noperational(route): ride it",
          "Easy to extend: a new concern (for example fuel) is added in one layer."),
         ("contextual", "4.7 Contextual Agent", "7_contextual.png",
          "First recognises the context (normal, rush hour or monsoon) from the clock, weather and traffic, then "
@@ -318,8 +355,8 @@ def build():
         "leaves Cheezious and rides the chosen route to the UCP gate. The traffic keeps left, as in Pakistan. "
         "The scene shows Khayaban-e-Jinnah as a dual carriageway with a signal chowk, the Canal Bank Road along "
         "the Lahore Canal with its underpass, the inner streets of Block G, cars, rickshaws, buses and bikes, "
-        "and lighting for the time of day. Test 2 has an evening sky and a traffic queue at the chowk. Test 3 has "
-        "rain, a fallen tree across Khayaban-e-Jinnah and a flooded underpass with a stalled car.")
+        "and lighting for the time of day. Test 2 has an evening sky and traffic queues at the chowk. Test 3 has "
+        "rain, a jam on Khayaban-e-Jinnah, an urgent 15-minute deadline and a flooded underpass with a stalled car.")
     bullets(doc, [
         "The decisions come from simulation/model.js, a line-by-line copy of the Python agents (verified by tools/check_parity.js).",
         "The rider's speed follows the model: free-flow speed on open road, crawling through the jam, pushing the bike through the flood. The total time equals the model's delivery time.",
@@ -329,9 +366,9 @@ def build():
     ])
     figure(doc, "sim_test1_utility.png", "Figure: Test 1, the Utility-Based agent rides route A.", width=15.5)
     figure(doc, "sim_test2_goal_jam.png", "Figure: Test 2, the Goal-Based agent crawls through the jam at Jinnah chowk.", width=15.5)
-    figure(doc, "sim_test3_start.png", "Figure: Test 3, rain, and Khayaban-e-Jinnah closed by a fallen tree.", width=15.5)
+    figure(doc, "sim_test3_start.png", "Figure: Test 3, rain and an urgent order at Cheezious.", width=15.5)
     figure(doc, "sim_test3_reflex_flood.png", "Figure: Test 3, the Simple Reflex agent is stuck in the flooded underpass.", width=15.5)
-    figure(doc, "sim_test3_race.png", "Figure: Test 3 race. Five agents take route C; Simple Reflex and Goal-Based take B.", width=15.5)
+    figure(doc, "sim_test3_race.png", "Figure: Test 3 race. Five agents take route C; Simple Reflex takes B and Goal-Based takes A.", width=15.5)
 
     # 6 -------------------------------------------------------------------
     doc.add_heading("6. Results", 1)
@@ -341,7 +378,8 @@ def build():
         rows.append([a["agent"]] + cells + ["%d/3" % a["on_time"], "%.1f" % a["total_minutes"]])
     table(doc, ["Agent", "Test 1", "Test 2", "Test 3", "On time", "Total min"], rows,
           widths=[3.8, 2.4, 2.4, 2.8, 1.8, 2.0], highlight=3)
-    doc.add_paragraph("Cell = chosen route and real delivery time in minutes. Deadline: 20 minutes.")
+    doc.add_paragraph("Cell = chosen route and real delivery time in minutes. Deadline: 20 minutes in Tests 1 and 2, "
+                      "15 minutes (urgent) in Test 3.")
     figure(doc, "cmp_matrix.png", "Figure: the route each agent chose in each situation (colour = route).", width=15.5)
 
     best = {1: ("A", 10.0), 2: ("B", 10.4), 3: ("C", 14.4)}
@@ -350,11 +388,12 @@ def build():
                      "learning": -1, "hierarchical": 1, "contextual": 1}
     for k, sc in enumerate(SCENARIOS):
         doc.add_heading("6.%d Test %d: %s" % (k + 1, sc["id"], sc["title"]), 2)
-        doc.add_paragraph(sc["story"] + " Best possible: route %s, %.1f min." % best[sc["id"]])
+        doc.add_paragraph(sc["story"] + " Deadline: %.0f min. Best possible: route %s, %.1f min."
+                          % ((deadline_of(sc),) + best[sc["id"]]))
         rows = []
         for a in res["agents"]:
             t = a["tests"][k]
-            margin = DEADLINE_MIN - t["minutes"]
+            margin = deadline_of(sc) - t["minutes"]
             rows.append([a["agent"], t["route"], "%.1f" % t["minutes"],
                          "On time" if t["on_time"] else "LATE",
                          ("%.1f spare" % margin) if margin >= 0 else ("%.1f late" % -margin),
@@ -366,12 +405,12 @@ def build():
     doc.add_heading("6.4 Summary of the three situations", 2)
     bullets(doc, [
         "Test 1: every agent takes A (10.0 min). With nothing unusual, all architectures are equal.",
-        "Test 2: the jam on A is visible on the app. Every agent except Goal-Based switches to B (10.4 min). "
-        "Goal-Based still takes the shortest road A and needs 19.2 min. It is on time, but only just.",
-        "Test 3: A is closed and the underpass on B is flooded, which cannot be seen. Simple Reflex (no memory) and "
-        "Goal-Based (traffic and weather are not part of its goal) take B and arrive after 24.5 min, which is late. "
-        "Every agent that keeps or learns a model of the rain (Model-Based, Utility, Learning, Hierarchical, Contextual) "
-        "takes C and arrives in 14.4 min.",
+        "Test 2: heavy traffic on A and C is visible on the app and all routes are open. Every agent except "
+        "Goal-Based picks B (10.4 min). Goal-Based still takes the shortest road A and needs 19.2 min: on time, but only just.",
+        "Test 3: rain, a jam on A and an urgent 15-minute deadline; the underpass on B is flooded, which cannot be seen. "
+        "Simple Reflex (no memory) avoids the jam but rides into the flood (24.5 min, late). Goal-Based ignores the jam "
+        "and takes A (19.2 min, late for the urgent order). Every agent that keeps or learns a model of the rain "
+        "(Model-Based, Utility, Learning, Hierarchical, Contextual) takes C and arrives in 14.4 min, inside the deadline.",
     ])
 
     # 7 -------------------------------------------------------------------
@@ -381,21 +420,22 @@ def build():
         "All seven agents received exactly the same percepts, so every difference below comes from the "
         "architecture alone. Test 1 does not separate them: with nothing unusual, every agent takes the shortest "
         "road A. Tests 2 and 3 show how each one reacts when something goes wrong.")
-    figure(doc, "cmp_times.png", "Figure: delivery time per agent and situation; bar colour = route chosen, dashed line = 20-minute deadline.", width=16.5)
+    figure(doc, "cmp_times.png", "Figure: delivery time per agent and situation; bar colour = route chosen, dashed line = deadline.", width=16.5)
     bullets(doc, [
         "Simple Reflex reacts only to what it sees right now. It avoids the visible jam on A in Test 2, "
-        "but in Test 3 its rule 'A closed, take B' sends the rider into the hidden flood (24.5 min, late).",
+        "but in Test 3 the same rule 'A jammed, take B' sends the rider into the hidden flood (24.5 min, late).",
         "Model-Based Reflex uses the same kind of rules, but it remembers that it has been raining for 45 minutes. "
         "Its world model says the underpass floods after 30 minutes, so it picks C. Memory is the only difference from Simple Reflex, "
         "and it decides Test 3.",
-        "Goal-Based plans a path to UCP on the map, but its cost is distance only. It ignores the jam in Test 2 "
-        "(19.2 min, on time by only 0.8 min) and the flood in Test 3 (late). Reaching the goal is not the same as reaching it well.",
-        "Utility-Based compares the expected outcome of every route. In Test 3 it gives B a utility of -42.5 "
-        "(85% chance of a 24.5-minute flooded trip) and C a utility of 71.2, so it picks C.",
+        "Goal-Based plans a path to UCP on the map, but its cost is distance only. It ignores the jam on A in both "
+        "Test 2 (19.2 min, on time by only 0.8 min) and Test 3 (19.2 min, late for the urgent 15-minute order). "
+        "Reaching the goal is not the same as reaching it well.",
+        "Utility-Based compares the expected outcome of every route against the order's own deadline. In Test 3 "
+        "A scores -38.4 (19.2 min cannot meet 15), B -42.5 (85% chance of a 24.5-minute flooded trip) and C 71.2, so it picks C.",
         "Learning makes the same choices as Utility-Based, but from experience: in its rain context, B averaged "
         "24.5 min and C 14.3 min over the training trips. It would need new training if the roads changed.",
-        "Hierarchical splits the choice into layers. The strategic layer forbids congested and flood-prone roads, "
-        "so the tactical layer is left with only B in Test 2 (C is slower) and only C in Test 3.",
+        "Hierarchical splits the choice into layers. The strategic layer sets subgoals (meet the deadline, avoid "
+        "congested and flood-prone roads), so the tactical layer is left with only B in Test 2 and only C in Test 3.",
         "Contextual recognises 'rush hour' and 'monsoon' and switches to the matching policy. It is right in "
         "all three tests, but only because these contexts were designed in advance.",
     ])
@@ -405,22 +445,24 @@ def build():
     table(doc, ["Agent", "Handles hidden flood", "Handles traffic", "Needs training", "Design effort", "Explains its choice"], [
         ["Simple Reflex", "No", "Yes (visible jam)", "No", "Very low", "Rule that fired"],
         ["Model-Based Reflex", "Yes (rule)", "Yes", "No", "Low", "State + rule"],
-        ["Goal-Based", "No", "No", "No", "Low", "Search path"],
+        ["Goal-Based", "No", "No (ignores jams)", "No", "Low", "Search path"],
         ["Utility-Based", "Yes (probability)", "Yes", "No", "Medium", "Utility of every route"],
         ["Learning", "Yes (learned)", "Yes", "Yes, 54 trips", "Medium", "Learned values"],
         ["Hierarchical", "Yes (constraint)", "Yes", "No", "Medium", "Each layer's decision"],
         ["Contextual", "Yes (context)", "Yes", "No", "Medium", "Context + policy"],
     ], widths=[3.2, 3.0, 2.6, 2.4, 2.3, 3.1], highlight=3)
     doc.add_paragraph(
-        "Five agents deliver all three orders on time in 34.8 minutes in total, so the results alone do not decide.")
+        "Five agents deliver all three orders on time in 34.8 minutes in total (the best possible), so the results "
+        "alone do not decide.")
     doc.add_heading("7.3 The most suitable agent", 2)
     doc.add_paragraph(
         "We choose the Utility-Based agent as the most suitable for this problem, for these reasons:")
     bullets(doc, [
         "It deals with uncertainty directly. The flood cannot be observed, and the agent reasons with P(flood) "
         "instead of a yes/no rule. A rule that is wrong 15% of the time is still a rule; the utility agent knows how risky B is.",
-        "It balances several goals at once: being on time, total minutes and rider safety. The weights can be "
-        "changed (for example, a heavier penalty for lateness on a premium order) without rewriting the agent.",
+        "It balances several goals at once: being on time, total minutes and rider safety, and it reads the "
+        "deadline from the order, so an urgent delivery changes its scores automatically (Test 3). The weights can "
+        "be changed without rewriting the agent.",
         "It needs no training data, unlike the Learning agent, and does not depend on a fixed list of contexts, "
         "unlike the Contextual agent. A new mix of conditions (for example a jam on A and light rain together) is "
         "still scored correctly.",
@@ -434,8 +476,9 @@ def build():
     doc.add_heading("8. Conclusion", 1)
     doc.add_paragraph(
         "The simple architectures do well while the world is fully visible (Tests 1 and 2), but they fail when an "
-        "important fact is hidden (Test 3). Agents that keep a model of the world, learn from experience or reason "
-        "about outcomes avoid the flooded underpass and deliver on time. The Utility-Based agent combines this with "
+        "important fact is hidden and time is short (Test 3: heavy traffic, rain and an urgent order). Agents that "
+        "keep a model of the world, learn from experience or reason about outcomes avoid the flooded underpass and "
+        "deliver on time. The Utility-Based agent combines this with "
         "explicit handling of uncertainty and adjustable goals, so it is the most suitable architecture for the "
         "Smart Food Delivery Agent. The 3D simulation makes these differences visible: the same order, the same "
         "roads, and seven riders that think in seven different ways.")

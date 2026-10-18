@@ -9,6 +9,7 @@
   const RESTAURANT = "Cheezious, Johar Town";
   const CUSTOMER = "University of Central Punjab (UCP), Khayaban-e-Jinnah";
   const DEADLINE_MIN = 20.0;
+  const URGENT_DEADLINE_MIN = 15.0;
   const RUSH_START = 17 * 60, RUSH_END = 20 * 60;
   const FLOOD_RAIN_MIN = 30;
 
@@ -67,23 +68,27 @@
   });
 
   const SCENARIOS = [
-    { id: 1, title: "Normal lunch hour",
+    { id: 1, title: "Normal traffic, good weather",
       story: "Clear sky at 1 pm. All three roads are moving normally.",
       order_time: "13:00", weather: "clear", rain_since: null, state: clearState() },
-    { id: 2, title: "Evening rush hour",
-      story: "6:10 pm. Office traffic has jammed the Jinnah signal chowk on " +
-             "Khayaban-e-Jinnah. The other roads are clear.",
+    { id: 2, title: "Heavy traffic, several routes",
+      story: "6:10 pm rush hour. Khayaban-e-Jinnah is jammed at the Jinnah signal " +
+             "chowk and the inner streets are also heavy. All three routes are open.",
       order_time: "18:10", weather: "clear", rain_since: null,
-      state: Object.assign(clearState(), { A: { traffic: "heavy", closed: false, flooded: false } }) },
-    { id: 3, title: "Monsoon rain",
-      story: "It has rained since 12:15. A fallen tree has closed " +
-             "Khayaban-e-Jinnah and the Canal underpass is under water, " +
-             "which the traffic app does not show.",
-      order_time: "13:00", weather: "rain", rain_since: "12:15",
       state: Object.assign(clearState(), {
-        A: { traffic: "light", closed: true, flooded: false },
+        A: { traffic: "heavy", closed: false, flooded: false },
+        C: { traffic: "heavy", closed: false, flooded: false } }) },
+    { id: 3, title: "Heavy traffic, rain, urgent",
+      story: "It has rained since 12:15 and Khayaban-e-Jinnah is jammed. The order " +
+             "is urgent: it must reach UCP in 15 minutes. The Canal underpass is " +
+             "under water, which the traffic app does not show.",
+      order_time: "13:00", weather: "rain", rain_since: "12:15", deadline: URGENT_DEADLINE_MIN,
+      state: Object.assign(clearState(), {
+        A: { traffic: "heavy", closed: false, flooded: false },
         B: { traffic: "light", closed: false, flooded: true } }) },
   ];
+
+  const deadlineOf = (sc) => (sc.deadline !== undefined ? sc.deadline : DEADLINE_MIN);
 
   function perceptHistory(sc) {
     const order = fromClock(sc.order_time);
@@ -98,7 +103,8 @@
     const s = sc.state, traffic = {}, closed = {};
     for (const r of ROUTE_IDS) { traffic[r] = s[r].traffic; closed[r] = s[r].closed; }
     return { time: sc.order_time, weather: sc.weather, traffic, closed,
-             deadline: DEADLINE_MIN, history: perceptHistory(sc) };
+             deadline: deadlineOf(sc), priority: deadlineOf(sc) < DEADLINE_MIN ? "urgent" : "normal",
+             history: perceptHistory(sc) };
   }
 
   function rainMinutes(p) {
@@ -130,7 +136,7 @@
     const s = sc.state[route], notes = [];
     if (s.traffic === "heavy") notes.push("stuck in traffic at " + ROUTES[route].hazard);
     if (s.flooded) notes.push("waded through flooded underpass");
-    return { route, minutes, on_time: minutes <= DEADLINE_MIN,
+    return { route, minutes, on_time: minutes <= deadlineOf(sc),
              note: notes.length ? notes.join("; ") : "smooth ride" };
   }
 
@@ -245,7 +251,7 @@
     utility(route, p) {
       const [outs, risk] = this.outcomes(route, p);
       const expected = outs.reduce((s, [pr, t]) => s + pr * t, 0);
-      const pOnTime = outs.reduce((s, [pr, t]) => s + (t <= DEADLINE_MIN ? pr : 0), 0);
+      const pOnTime = outs.reduce((s, [pr, t]) => s + (t <= p.deadline ? pr : 0), 0);
       const u = this.W_ON_TIME * pOnTime - this.W_TIME * expected - this.W_RISK * risk;
       return [round(u, 2), round(expected, 2), round(pOnTime, 2)];
     }
@@ -305,30 +311,31 @@
     constructor() { this.name = "Hierarchical"; this.key = "hierarchical"; }
     reset() {}
     strategic(p) {
-      return { avoid_congestion: true, avoid_flood_prone: rainMinutes(p) >= FLOOD_RAIN_MIN,
-               mode: p.weather === "rain" ? "safe" : "fast" };
+      return { deadline: p.deadline, priority: p.priority, avoid_congestion: true,
+               avoid_flood_prone: rainMinutes(p) >= FLOOD_RAIN_MIN, wet: p.weather === "rain" };
     }
-    tactical(p, plan) {
+    tactical(p, sub) {
       let cands = openRoutes(p).filter((r) =>
-        !(plan.avoid_congestion && p.traffic[r] === "heavy") &&
-        !(plan.avoid_flood_prone && ROUTES[r].flood_delay > 0));
+        !(sub.avoid_congestion && p.traffic[r] === "heavy") &&
+        !(sub.avoid_flood_prone && ROUTES[r].flood_delay > 0) &&
+        !(baseMinutes(r) > sub.deadline));
       if (!cands.length) cands = openRoutes(p);
       let best = cands[0];
       for (const r of cands) if (baseMinutes(r) < baseMinutes(best)) best = r;
       return [best, cands];
     }
-    operational(route, plan) {
-      const speed = ROUTES[route].speed_kmh * (plan.mode === "safe" ? 0.8 : 1.0);
-      return "limit speed to " + Math.round(speed) + " km/h on bad patches, stop at red signals, keep the food box level";
+    operational(route, sub) {
+      const speed = ROUTES[route].speed_kmh * (sub.wet ? 0.8 : 1.0);
+      return "limit speed to " + Math.round(speed) + " km/h on wet patches, stop at red signals, keep the food box level";
     }
     decide(p) {
-      const plan = this.strategic(p);
-      const [route, cands] = this.tactical(p, plan);
+      const sub = this.strategic(p);
+      const [route, cands] = this.tactical(p, sub);
       return [route, [
-        "Strategic layer: mode=" + plan.mode + ", avoid congestion=" + pyBool(plan.avoid_congestion) +
-          ", avoid flood-prone=" + pyBool(plan.avoid_flood_prone) + ".",
-        "Tactical layer: allowed routes " + cands.join(", ") + ", fastest of them is " + route + ".",
-        "Operational layer: " + this.operational(route, plan) + ".",
+        "Strategic layer, subgoals: arrive within " + Math.round(sub.deadline) + " min (" + sub.priority +
+          " order), avoid congestion, " + (sub.avoid_flood_prone ? "avoid flood-prone roads" : "flood risk low") + ".",
+        "Tactical layer: routes meeting the subgoals: " + cands.join(", ") + "; fastest is " + route + ".",
+        "Operational layer: " + this.operational(route, sub) + ".",
       ]];
     }
   }
@@ -371,7 +378,7 @@
     });
   }
 
-  const api = { RESTAURANT, CUSTOMER, DEADLINE_MIN, FLOOD_RAIN_MIN, NODES, EDGES, ROUTES, ROUTE_IDS,
+  const api = { RESTAURANT, CUSTOMER, DEADLINE_MIN, URGENT_DEADLINE_MIN, deadlineOf, FLOOD_RAIN_MIN, NODES, EDGES, ROUTES, ROUTE_IDS,
     SCENARIOS, TRAINING_DAYS, routeKm, baseMinutes, makePercept, rainMinutes, tripMinutes, execute,
     isRush, toClock, fromClock, ALL_AGENTS, runAll };
   if (typeof module !== "undefined" && module.exports) module.exports = api;

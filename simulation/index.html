@@ -16,7 +16,7 @@
       <span class="dot"></span>
       <div>
         <h1>Smart Food Delivery Agent</h1>
-        <p>Cheezious, Johar Town &rarr; University of Central Punjab &middot; deadline 20 min</p>
+        <p>Cheezious, Johar Town &rarr; University of Central Punjab &middot; deadline 20 min (urgent 15)</p>
       </div>
     </div>
     <div class="top-actions">
@@ -31,9 +31,9 @@
     <h2>Simulation</h2>
     <label class="field">Situation
       <select id="scenario">
-        <option value="1">Test 1 &middot; Normal lunch hour</option>
-        <option value="2">Test 2 &middot; Evening rush hour</option>
-        <option value="3">Test 3 &middot; Monsoon rain</option>
+        <option value="1">Test 1 &middot; Normal traffic, good weather</option>
+        <option value="2">Test 2 &middot; Heavy traffic, several routes</option>
+        <option value="3">Test 3 &middot; Heavy traffic, rain, urgent</option>
         <option value="custom">Custom situation&hellip;</option>
       </select>
     </label>
@@ -54,6 +54,7 @@
           <option value="45">Raining for 45 min</option>
         </select>
       </label>
+      <label class="check"><input type="checkbox" id="cUrgent"> Urgent order (15-minute deadline)</label>
       <table class="ctable">
         <thead><tr><th></th><th>Jam</th><th>Closed</th><th>Flooded</th></tr></thead>
         <tbody>
@@ -141,7 +142,7 @@
   <dialog id="dlgHelp">
     <h2>How it works</h2>
     <p>A foodpanda-style rider picks up an order at <b>Cheezious, Johar Town</b> and must hand it over at the
-      <b>University of Central Punjab</b> main gate within <b>20 minutes</b>. There are three routes:</p>
+      <b>University of Central Punjab</b> main gate within <b>20 minutes</b> (15 minutes for an urgent order). There are three routes:</p>
     <ul>
       <li><b class="ra">A</b> Khayaban-e-Jinnah Road: 3.00 km, 10.0 min, the shortest. Jams at the Jinnah signal chowk in rush hour.</li>
       <li><b class="rb">B</b> Canal Bank Road: 3.25 km, 10.4 min. Fast, but its underpass floods after about 30 minutes of rain.</li>

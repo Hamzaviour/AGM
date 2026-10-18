@@ -19,7 +19,8 @@ simulation and this program give identical answers (tools/check_parity.js).
 
 RESTAURANT = "Cheezious, Johar Town"
 CUSTOMER = "University of Central Punjab (UCP), Khayaban-e-Jinnah"
-DEADLINE_MIN = 20.0          # the order must reach UCP within 20 minutes of pickup
+DEADLINE_MIN = 20.0          # normal order: reach UCP within 20 minutes of pickup
+URGENT_DEADLINE_MIN = 15.0   # urgent order: within 15 minutes
 
 RUSH_START, RUSH_END = 17 * 60, 20 * 60     # evening rush hour, minutes after midnight
 FLOOD_RAIN_MIN = 30                         # underpass floods after 30 min of rain
@@ -88,7 +89,7 @@ def from_clock(text):
 SCENARIOS = [
     {
         "id": 1,
-        "title": "Normal lunch hour",
+        "title": "Normal traffic, good weather",
         "story": "Clear sky at 1 pm. All three roads are moving normally.",
         "order_time": "13:00",
         "weather": "clear",
@@ -101,34 +102,39 @@ SCENARIOS = [
     },
     {
         "id": 2,
-        "title": "Evening rush hour",
-        "story": "6:10 pm. Office traffic has jammed the Jinnah signal chowk on "
-                 "Khayaban-e-Jinnah. The other roads are clear.",
+        "title": "Heavy traffic, several routes",
+        "story": "6:10 pm rush hour. Khayaban-e-Jinnah is jammed at the Jinnah signal "
+                 "chowk and the inner streets are also heavy. All three routes are open.",
         "order_time": "18:10",
         "weather": "clear",
         "rain_since": None,
         "state": {
             "A": {"traffic": "heavy", "closed": False, "flooded": False},
             "B": {"traffic": "light", "closed": False, "flooded": False},
-            "C": {"traffic": "light", "closed": False, "flooded": False},
+            "C": {"traffic": "heavy", "closed": False, "flooded": False},
         },
     },
     {
         "id": 3,
-        "title": "Monsoon rain",
-        "story": "It has rained since 12:15. A fallen tree has closed "
-                 "Khayaban-e-Jinnah and the Canal underpass is under water, "
-                 "which the traffic app does not show.",
+        "title": "Heavy traffic, rain, urgent",
+        "story": "It has rained since 12:15 and Khayaban-e-Jinnah is jammed. The order "
+                 "is urgent: it must reach UCP in 15 minutes. The Canal underpass is "
+                 "under water, which the traffic app does not show.",
         "order_time": "13:00",
         "weather": "rain",
         "rain_since": "12:15",
+        "deadline": URGENT_DEADLINE_MIN,
         "state": {
-            "A": {"traffic": "light", "closed": True, "flooded": False},
+            "A": {"traffic": "heavy", "closed": False, "flooded": False},
             "B": {"traffic": "light", "closed": False, "flooded": True},
             "C": {"traffic": "light", "closed": False, "flooded": False},
         },
     },
 ]
+
+
+def deadline_of(scenario):
+    return scenario.get("deadline", DEADLINE_MIN)
 
 
 def percept_history(scenario):
@@ -149,6 +155,7 @@ def make_percept(scenario):
 
     - the clock and the weather
     - live traffic for every route (from the rider app)
+    - the order's deadline and priority (normal or urgent)
     - closures: Khayaban-e-Jinnah starts right outside Cheezious, so a closure
       there is seen directly; the app also lists reported closures
     Flooding of the underpass is NOT part of the percept: it is 2 km away and
@@ -160,7 +167,8 @@ def make_percept(scenario):
         "weather": scenario["weather"],
         "traffic": {r: state[r]["traffic"] for r in ROUTE_IDS},
         "closed": {r: state[r]["closed"] for r in ROUTE_IDS},
-        "deadline": DEADLINE_MIN,
+        "deadline": deadline_of(scenario),
+        "priority": "urgent" if deadline_of(scenario) < DEADLINE_MIN else "normal",
         "history": percept_history(scenario),
     }
 
@@ -209,7 +217,7 @@ def execute(route, scenario):
         notes.append("stuck in traffic at %s" % ROUTES[route]["hazard"])
     if s["flooded"]:
         notes.append("waded through flooded underpass")
-    return {"route": route, "minutes": minutes, "on_time": minutes <= DEADLINE_MIN,
+    return {"route": route, "minutes": minutes, "on_time": minutes <= deadline_of(scenario),
             "note": "; ".join(notes) if notes else "smooth ride"}
 
 

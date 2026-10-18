@@ -21,8 +21,8 @@ ROOT = os.path.join(HERE, "..")
 OUT = os.path.join(ROOT, "diagrams")
 sys.path.insert(0, os.path.join(ROOT, "code"))
 from agents import LearningAgent, UtilityBasedAgent  # noqa: E402
-from environment import (DEADLINE_MIN, ROUTE_IDS, SCENARIOS, make_percept,  # noqa: E402
-                         rain_minutes)
+from environment import (DEADLINE_MIN, ROUTE_IDS, SCENARIOS, deadline_of,  # noqa: E402
+                         make_percept, rain_minutes)
 
 # Route colours (colourblind-checked: blue, aqua, orange) and status colours.
 ROUTE = {"A": "#2a78d6", "B": "#1baf7a", "C": "#eb6834"}
@@ -70,9 +70,10 @@ def chart_times(res):
             label = "%s  %.1f" % (t["route"], t["minutes"]) + ("" if t["on_time"] else "  LATE")
             ax.text(t["minutes"] + 0.4, y, label, va="center", fontsize=8.5,
                     color=CRITICAL if not t["on_time"] else INK, weight="bold" if not t["on_time"] else "normal")
-        ax.axvline(DEADLINE_MIN, color=INK, lw=1.2, ls=(0, (4, 3)))
+        due = sc.get("deadline", DEADLINE_MIN)
+        ax.axvline(due, color=INK, lw=1.2, ls=(0, (4, 3)))
         ax.set_ylim(-1.1, len(agents) - 0.4)
-        ax.text(DEADLINE_MIN + 0.4, -0.85, "deadline 20 min", fontsize=8, color=MUTED, ha="left")
+        ax.text(due + 0.4, -0.85, "deadline %.0f min" % due, fontsize=8, color=MUTED, ha="left")
         ax.set_xlim(0, 31)
         ax.set_title("Test %d: %s" % (sc["id"], sc["title"]), fontsize=11, loc="left", color=INK)
         ax.set_xlabel("delivery time (min)")
@@ -172,7 +173,7 @@ def chart_learning():
             ax.bar(x, -q, width=0.6, color=ROUTE[r], edgecolor="white", linewidth=2)
             ax.text(x, -q - 0.6, "%.1f" % -q, ha="center", va="top", fontsize=9, color="white", weight="bold")
         ax.axhline(DEADLINE_MIN, color=INK, lw=1, ls=(0, (4, 3)))
-        ax.text(2.45, DEADLINE_MIN + 0.4, "deadline", ha="right", fontsize=8, color=MUTED)
+        ax.text(2.45, DEADLINE_MIN + 0.4, "20-min deadline", ha="right", fontsize=8, color=MUTED)
         ax.set_xticks(range(3)); ax.set_xticklabels(["Route " + r for r in ROUTE_IDS])
         ax.set_title("Context: %s" % ctx, loc="left", fontsize=10.5)
         ax.grid(axis="y", color=GRID, lw=0.8); ax.set_axisbelow(True); ax.tick_params(bottom=False)
@@ -191,7 +192,8 @@ def percept_summary(sc):
     weather = "rain for %d min" % rain if p["weather"] == "rain" else "clear"
     traffic = " ".join("%s:%s" % (r, p["traffic"][r]) for r in ROUTE_IDS)
     closed = ", ".join(r for r in ROUTE_IDS if p["closed"][r]) or "none"
-    return "PERCEPT  %s, %s\ntraffic  %s\nclosed: %s" % (p["time"], weather, traffic, closed)
+    return "PERCEPT  %s, %s\ntraffic  %s\nclosed: %s, %s order (%.0f min)" % (
+        p["time"], weather, traffic, closed, p["priority"], p["deadline"])
 
 
 def trace(agent_row, res):
@@ -238,7 +240,7 @@ def trace(agent_row, res):
         arrow(x, y, y - 0.3); y -= 0.3
         y = boxed(x, y, "DECISION: ride route %s" % t["route"], ROUTE[t["route"]], ROUTE[t["route"]], "white", True)
         arrow(x, y, y - 0.3); y -= 0.3
-        status = ("ON TIME" if t["on_time"] else "LATE by %.1f min" % (t["minutes"] - DEADLINE_MIN))
+        status = ("ON TIME" if t["on_time"] else "LATE by %.1f min" % (t["minutes"] - deadline_of(sc)))
         boxed(x, y, "%s  -  %.1f min\n%s" % (status, t["minutes"], t["note"]),
               GOOD if t["on_time"] else CRITICAL, GOOD if t["on_time"] else CRITICAL, "white", True)
     fig.suptitle("%s agent: reasoning in each situation" % agent_row["agent"], x=0.01, ha="left",
