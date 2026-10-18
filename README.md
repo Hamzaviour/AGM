@@ -41,7 +41,9 @@ python main.py --details  # tables + every agent's reasoning
 
 ## Open the simulation
 
-Double-click `simulation/index.html` (Chrome, Edge or Firefox). It works offline because Three.js is included in `simulation/vendor/`. Choose a situation and an agent, then press **Run delivery**.
+**Live:** https://agm-assignment1.vercel.app
+
+Or run it locally: double-click `simulation/index.html` (Chrome, Edge or Firefox). It works offline because Three.js is included in `simulation/vendor/`. Choose a situation and an agent, then press **Run delivery**.
 
 - **Test 1 to 3** match the report. **Custom situation** lets you set the time, rain, jams, closures and flooding yourself.
 - **All agents (race)** sends all seven riders out at once, with a live leaderboard.
