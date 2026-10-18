@@ -1,0 +1,133 @@
+SMART FOOD DELIVERY AGENT - Cheezious, Johar Town -> University of Central Punjab (UCP), Khayaban-e-Jinnah
+Deadline: 20 minutes from pickup
+
+Routes
+  A  Khayaban-e-Jinnah Road         3.00 km, 10.0 min free-flow
+  B  Canal Bank Road (underpass)    3.25 km, 10.4 min free-flow
+  C  Johar Town inner streets       4.20 km, 14.4 min free-flow
+
+Test situations
+  Test 1  Normal lunch hour  Clear sky at 1 pm. All three roads are moving normally.
+  Test 2  Evening rush hour  6:10 pm. Office traffic has jammed the Jinnah signal chowk on Khayaban-e-Jinnah. The other roads are clear.
+  Test 3  Monsoon rain       It has rained since 12:15. A fallen tree has closed Khayaban-e-Jinnah and the Canal underpass is under water, which the traffic app does not show.
+
+Agent                | Test 1          | Test 2          | Test 3          | On time | Total min
+------------------------------------------------------------------------------------------------
+Simple Reflex        | A 10.0          | B 10.4          | B 24.5 (late)   | 2/3     | 44.9
+Model-Based Reflex   | A 10.0          | B 10.4          | C 14.4          | 3/3     | 34.8
+Goal-Based           | A 10.0          | A 19.2          | B 24.5 (late)   | 2/3     | 53.7
+Utility-Based        | A 10.0          | B 10.4          | C 14.4          | 3/3     | 34.8
+Learning             | A 10.0          | B 10.4          | C 14.4          | 3/3     | 34.8
+Hierarchical         | A 10.0          | B 10.4          | C 14.4          | 3/3     | 34.8
+Contextual           | A 10.0          | B 10.4          | C 14.4          | 3/3     | 34.8
+
+Cell = chosen route and real delivery time in minutes.
+
+======================================================================
+Simple Reflex
+  Test 1 -> route A, 10.0 min, on time, smooth ride
+      Rule fired: IF the road ahead is clear THEN take route A.
+      No memory: earlier percepts are ignored.
+  Test 2 -> route B, 10.4 min, on time, smooth ride
+      Rule fired: IF Khayaban-e-Jinnah is jammed THEN take route B.
+      No memory: earlier percepts are ignored.
+  Test 3 -> route B, 24.5 min, LATE, waded through flooded underpass
+      Rule fired: IF Khayaban-e-Jinnah is closed THEN take route B.
+      No memory: earlier percepts are ignored.
+
+======================================================================
+Model-Based Reflex
+  Test 1 -> route A, 10.0 min, on time, smooth ride
+      Internal state: raining for 0 min, A blocked=False, underpass flooded (believed)=False.
+      Rule: main road is fine -> take A.
+  Test 2 -> route B, 10.4 min, on time, smooth ride
+      Internal state: raining for 0 min, A blocked=True, underpass flooded (believed)=False.
+      Rule: A blocked and canal road believed dry -> take B.
+  Test 3 -> route C, 14.4 min, on time, smooth ride
+      Internal state: raining for 45 min, A blocked=True, underpass flooded (believed)=True.
+      Rule: A blocked and underpass believed flooded -> take C.
+
+======================================================================
+Goal-Based
+  Test 1 -> route A, 10.0 min, on time, smooth ride
+      Goal: reach UCP. Closed roads removed from the map: none.
+      Uniform-cost search found CHZ -> A1 -> UCP (3.00 km) on route A.
+      Traffic and weather are not part of the goal test, so they are ignored.
+  Test 2 -> route A, 19.2 min, on time, stuck in traffic at signal chowk queue
+      Goal: reach UCP. Closed roads removed from the map: none.
+      Uniform-cost search found CHZ -> A1 -> UCP (3.00 km) on route A.
+      Traffic and weather are not part of the goal test, so they are ignored.
+  Test 3 -> route B, 24.5 min, LATE, waded through flooded underpass
+      Goal: reach UCP. Closed roads removed from the map: A.
+      Uniform-cost search found CHZ -> B1 -> B2 -> UCP (3.25 km) on route B.
+      Traffic and weather are not part of the goal test, so they are ignored.
+
+======================================================================
+Utility-Based
+  Test 1 -> route A, 10.0 min, on time, smooth ride
+      U = 100*P(on time) - 2*E[minutes] - 15*P(flood)
+      Route A: E[t]=10.0 min, P(on time)=1.00, U=80.0
+      Route B: E[t]=10.4 min, P(on time)=1.00, U=79.2
+      Route C: E[t]=14.4 min, P(on time)=1.00, U=71.2
+      Highest utility -> route A.
+  Test 2 -> route B, 10.4 min, on time, smooth ride
+      U = 100*P(on time) - 2*E[minutes] - 15*P(flood)
+      Route A: E[t]=19.2 min, P(on time)=1.00, U=61.6
+      Route B: E[t]=10.4 min, P(on time)=1.00, U=79.2
+      Route C: E[t]=14.4 min, P(on time)=1.00, U=71.2
+      Highest utility -> route B.
+  Test 3 -> route C, 14.4 min, on time, smooth ride
+      U = 100*P(on time) - 2*E[minutes] - 15*P(flood)
+      Route B: E[t]=22.4 min, P(on time)=0.15, U=-42.5
+      Route C: E[t]=14.4 min, P(on time)=1.00, U=71.2
+      Highest utility -> route C.
+
+======================================================================
+Learning
+  Test 1 -> route A, 10.0 min, on time, smooth ride
+      Context recognised: normal. Learned from 54 training trips.
+      Q(normal, A) = -9.9  (about 9.9 min)
+      Q(normal, B) = -10.5  (about 10.5 min)
+      Q(normal, C) = -14.3  (about 14.3 min)
+      Exploit best learned value -> route A.
+  Test 2 -> route B, 10.4 min, on time, smooth ride
+      Context recognised: rush. Learned from 54 training trips.
+      Q(rush, A) = -19.1  (about 19.1 min)
+      Q(rush, B) = -10.3  (about 10.3 min)
+      Q(rush, C) = -15.9  (about 15.9 min)
+      Exploit best learned value -> route B.
+  Test 3 -> route C, 14.4 min, on time, smooth ride
+      Context recognised: rain. Learned from 54 training trips.
+      Q(rain, B) = -24.5  (about 24.5 min)
+      Q(rain, C) = -14.3  (about 14.3 min)
+      Exploit best learned value -> route C.
+
+======================================================================
+Hierarchical
+  Test 1 -> route A, 10.0 min, on time, smooth ride
+      Strategic layer: mode=fast, avoid congestion=True, avoid flood-prone=False.
+      Tactical layer: allowed routes A, B, C, fastest of them is A.
+      Operational layer: limit speed to 18 km/h on bad patches, stop at red signals, keep the food box level.
+  Test 2 -> route B, 10.4 min, on time, smooth ride
+      Strategic layer: mode=fast, avoid congestion=True, avoid flood-prone=False.
+      Tactical layer: allowed routes B, C, fastest of them is B.
+      Operational layer: limit speed to 19 km/h on bad patches, stop at red signals, keep the food box level.
+  Test 3 -> route C, 14.4 min, on time, smooth ride
+      Strategic layer: mode=safe, avoid congestion=True, avoid flood-prone=True.
+      Tactical layer: allowed routes C, fastest of them is C.
+      Operational layer: limit speed to 14 km/h on bad patches, stop at red signals, keep the food box level.
+
+======================================================================
+Contextual
+  Test 1 -> route A, 10.0 min, on time, smooth ride
+      Context: normal (time 13:00, weather clear).
+      Policy for normal: preference A > B > C.
+      First open route in the policy -> A.
+  Test 2 -> route B, 10.4 min, on time, smooth ride
+      Context: rush hour (time 18:10, weather clear).
+      Policy for rush hour: preference B > C > A.
+      First open route in the policy -> B.
+  Test 3 -> route C, 14.4 min, on time, smooth ride
+      Context: monsoon (time 13:00, weather rain).
+      Policy for monsoon: preference C > A > B.
+      First open route in the policy -> C.

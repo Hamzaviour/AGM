@@ -8,7 +8,15 @@ Agent Based Modeling, Assignment 1 (group). University of Central Punjab.
 | Rida | L1F23BSAI0091 |
 | Muhammad Abdullah | L1F23BSAI0063 |
 
-Seven single-agent architectures solve the same delivery problem: Simple Reflex, Model-Based Reflex, Goal-Based, Utility-Based, Learning, Hierarchical and Contextual.
+A foodpanda-style rider picks up an order at **Cheezious, Johar Town** and must hand it over at the **University of Central Punjab (UCP)** main gate within 20 minutes. Seven single-agent architectures solve the same delivery problem: Simple Reflex, Model-Based Reflex, Goal-Based, Utility-Based, Learning, Hierarchical and Contextual.
+
+The three destinations (routes) from Cheezious to UCP:
+
+| Route | Road | Distance | Free-flow time | Risk |
+|---|---|---|---|---|
+| A | Khayaban-e-Jinnah Road | 3.00 km | 10.0 min | Jams at the Jinnah signal chowk in rush hour |
+| B | Canal Bank Road (underpass) | 3.25 km | 10.4 min | The underpass floods after 30 min of rain (not shown on the rider app) |
+| C | Johar Town inner streets | 4.20 km | 14.4 min | Longest, rarely blocked |
 
 ## What is where
 
@@ -17,8 +25,8 @@ Seven single-agent architectures solve the same delivery problem: Simple Reflex,
 | `report/` | The report as Word (`.docx`) and PDF |
 | `code/` | Python code: `environment.py`, `agents.py`, `main.py` |
 | `results/` | Program output for the three test cases (`.txt` and `.json`) |
-| `diagrams/` | Architecture diagram for each agent (PNG) |
-| `simulation/` | Interactive simulation; open `index.html` |
+| `diagrams/` | Architecture diagram for each agent, the route map, and simulation screenshots (PNG) |
+| `simulation/` | Interactive 3D simulation; open `index.html` |
 | `tools/` | Scripts that rebuild the diagrams and report, and check that the simulation matches the Python code |
 
 ## Run the code
@@ -33,7 +41,29 @@ python main.py --details  # tables + every agent's reasoning
 
 ## Open the simulation
 
-Double-click `simulation/index.html` (Chrome or Edge). It works offline. Choose a situation and an agent, then press **Run delivery**.
+Double-click `simulation/index.html` (Chrome, Edge or Firefox). It works offline because Three.js is included in `simulation/vendor/`. Choose a situation and an agent, then press **Run delivery**.
+
+- **Test 1 to 3** match the report. **Custom situation** lets you set the time, rain, jams, closures and flooding yourself.
+- **All agents (race)** sends all seven riders out at once, with a live leaderboard.
+- Cameras: Chase, Map (top view) and Orbit (drag to rotate, scroll or pinch to zoom). Speeds: 1x, 2x, 4x and 8x. One simulated minute takes 2 seconds at 1x.
+- Keyboard: Space = run, 1/2/3 = test, C = switch camera.
+- Link options: `?test=3&agent=race&cam=top&speed=4&autorun=1` (agent is `0` to `6` or `race`).
+
+The map is schematic, not to scale. Traffic keeps left, as in Pakistan.
+
+## Deploy on Vercel
+
+The repository deploys as a static site. Nothing needs to be built. `vercel.json` redirects `/` to `/simulation/`.
+
+**Dashboard:** on vercel.com choose *Add New → Project*, import this GitHub repository and set *Framework Preset* to **Other**. Leave the build and output settings empty, then press **Deploy**.
+
+**CLI:**
+
+```
+npm i -g vercel
+vercel          # first time: log in and link the project
+vercel --prod
+```
 
 ## Results at a glance
 
@@ -47,6 +77,8 @@ Double-click `simulation/index.html` (Chrome or Edge). It works offline. Choose 
 | Hierarchical | A 10.0 | B 10.4 | C 14.4 | 3/3 |
 | Contextual | A 10.0 | B 10.4 | C 14.4 | 3/3 |
 
+Test 1: normal lunch hour. Test 2: evening rush hour, with A jammed. Test 3: monsoon rain; A is closed by a fallen tree and the B underpass is flooded.
+
 Most suitable: the **Utility-Based Agent** (see Section 7 of the report).
 
 ## Rebuild (optional)
@@ -54,8 +86,8 @@ Most suitable: the **Utility-Based Agent** (see Section 7 of the report).
 ```
 python code/main.py
 node tools/check_parity.js
-python tools/export_diagrams.py
-python tools/build_report.py      # needs python-docx, Pillow, Microsoft Word for the PDF
+python tools/export_diagrams.py   # needs matplotlib
+python tools/build_report.py      # needs python-docx, Pillow; PDF via LibreOffice or Microsoft Word
 ```
 
 To fill in the section and instructor name on the title page, edit `TITLE_INFO` at the top of `tools/build_report.py` and run it again, or edit the Word file directly.

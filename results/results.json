@@ -1,0 +1,334 @@
+{
+  "deadline": 20.0,
+  "scenarios": [
+    {
+      "id": 1,
+      "title": "Normal lunch hour",
+      "story": "Clear sky at 1 pm. All three roads are moving normally."
+    },
+    {
+      "id": 2,
+      "title": "Evening rush hour",
+      "story": "6:10 pm. Office traffic has jammed the Jinnah signal chowk on Khayaban-e-Jinnah. The other roads are clear."
+    },
+    {
+      "id": 3,
+      "title": "Monsoon rain",
+      "story": "It has rained since 12:15. A fallen tree has closed Khayaban-e-Jinnah and the Canal underpass is under water, which the traffic app does not show."
+    }
+  ],
+  "agents": [
+    {
+      "agent": "Simple Reflex",
+      "key": "simple_reflex",
+      "tests": [
+        {
+          "test": 1,
+          "route": "A",
+          "minutes": 10.0,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Rule fired: IF the road ahead is clear THEN take route A.",
+            "No memory: earlier percepts are ignored."
+          ]
+        },
+        {
+          "test": 2,
+          "route": "B",
+          "minutes": 10.4,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Rule fired: IF Khayaban-e-Jinnah is jammed THEN take route B.",
+            "No memory: earlier percepts are ignored."
+          ]
+        },
+        {
+          "test": 3,
+          "route": "B",
+          "minutes": 24.5,
+          "on_time": false,
+          "note": "waded through flooded underpass",
+          "reasoning": [
+            "Rule fired: IF Khayaban-e-Jinnah is closed THEN take route B.",
+            "No memory: earlier percepts are ignored."
+          ]
+        }
+      ],
+      "on_time": 2,
+      "total_minutes": 44.9
+    },
+    {
+      "agent": "Model-Based Reflex",
+      "key": "model_based",
+      "tests": [
+        {
+          "test": 1,
+          "route": "A",
+          "minutes": 10.0,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Internal state: raining for 0 min, A blocked=False, underpass flooded (believed)=False.",
+            "Rule: main road is fine -> take A."
+          ]
+        },
+        {
+          "test": 2,
+          "route": "B",
+          "minutes": 10.4,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Internal state: raining for 0 min, A blocked=True, underpass flooded (believed)=False.",
+            "Rule: A blocked and canal road believed dry -> take B."
+          ]
+        },
+        {
+          "test": 3,
+          "route": "C",
+          "minutes": 14.4,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Internal state: raining for 45 min, A blocked=True, underpass flooded (believed)=True.",
+            "Rule: A blocked and underpass believed flooded -> take C."
+          ]
+        }
+      ],
+      "on_time": 3,
+      "total_minutes": 34.8
+    },
+    {
+      "agent": "Goal-Based",
+      "key": "goal_based",
+      "tests": [
+        {
+          "test": 1,
+          "route": "A",
+          "minutes": 10.0,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Goal: reach UCP. Closed roads removed from the map: none.",
+            "Uniform-cost search found CHZ -> A1 -> UCP (3.00 km) on route A.",
+            "Traffic and weather are not part of the goal test, so they are ignored."
+          ]
+        },
+        {
+          "test": 2,
+          "route": "A",
+          "minutes": 19.2,
+          "on_time": true,
+          "note": "stuck in traffic at signal chowk queue",
+          "reasoning": [
+            "Goal: reach UCP. Closed roads removed from the map: none.",
+            "Uniform-cost search found CHZ -> A1 -> UCP (3.00 km) on route A.",
+            "Traffic and weather are not part of the goal test, so they are ignored."
+          ]
+        },
+        {
+          "test": 3,
+          "route": "B",
+          "minutes": 24.5,
+          "on_time": false,
+          "note": "waded through flooded underpass",
+          "reasoning": [
+            "Goal: reach UCP. Closed roads removed from the map: A.",
+            "Uniform-cost search found CHZ -> B1 -> B2 -> UCP (3.25 km) on route B.",
+            "Traffic and weather are not part of the goal test, so they are ignored."
+          ]
+        }
+      ],
+      "on_time": 2,
+      "total_minutes": 53.7
+    },
+    {
+      "agent": "Utility-Based",
+      "key": "utility_based",
+      "tests": [
+        {
+          "test": 1,
+          "route": "A",
+          "minutes": 10.0,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "U = 100*P(on time) - 2*E[minutes] - 15*P(flood)",
+            "Route A: E[t]=10.0 min, P(on time)=1.00, U=80.0",
+            "Route B: E[t]=10.4 min, P(on time)=1.00, U=79.2",
+            "Route C: E[t]=14.4 min, P(on time)=1.00, U=71.2",
+            "Highest utility -> route A."
+          ]
+        },
+        {
+          "test": 2,
+          "route": "B",
+          "minutes": 10.4,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "U = 100*P(on time) - 2*E[minutes] - 15*P(flood)",
+            "Route A: E[t]=19.2 min, P(on time)=1.00, U=61.6",
+            "Route B: E[t]=10.4 min, P(on time)=1.00, U=79.2",
+            "Route C: E[t]=14.4 min, P(on time)=1.00, U=71.2",
+            "Highest utility -> route B."
+          ]
+        },
+        {
+          "test": 3,
+          "route": "C",
+          "minutes": 14.4,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "U = 100*P(on time) - 2*E[minutes] - 15*P(flood)",
+            "Route B: E[t]=22.4 min, P(on time)=0.15, U=-42.5",
+            "Route C: E[t]=14.4 min, P(on time)=1.00, U=71.2",
+            "Highest utility -> route C."
+          ]
+        }
+      ],
+      "on_time": 3,
+      "total_minutes": 34.8
+    },
+    {
+      "agent": "Learning",
+      "key": "learning",
+      "tests": [
+        {
+          "test": 1,
+          "route": "A",
+          "minutes": 10.0,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Context recognised: normal. Learned from 54 training trips.",
+            "Q(normal, A) = -9.9  (about 9.9 min)",
+            "Q(normal, B) = -10.5  (about 10.5 min)",
+            "Q(normal, C) = -14.3  (about 14.3 min)",
+            "Exploit best learned value -> route A."
+          ]
+        },
+        {
+          "test": 2,
+          "route": "B",
+          "minutes": 10.4,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Context recognised: rush. Learned from 54 training trips.",
+            "Q(rush, A) = -19.1  (about 19.1 min)",
+            "Q(rush, B) = -10.3  (about 10.3 min)",
+            "Q(rush, C) = -15.9  (about 15.9 min)",
+            "Exploit best learned value -> route B."
+          ]
+        },
+        {
+          "test": 3,
+          "route": "C",
+          "minutes": 14.4,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Context recognised: rain. Learned from 54 training trips.",
+            "Q(rain, B) = -24.5  (about 24.5 min)",
+            "Q(rain, C) = -14.3  (about 14.3 min)",
+            "Exploit best learned value -> route C."
+          ]
+        }
+      ],
+      "on_time": 3,
+      "total_minutes": 34.8
+    },
+    {
+      "agent": "Hierarchical",
+      "key": "hierarchical",
+      "tests": [
+        {
+          "test": 1,
+          "route": "A",
+          "minutes": 10.0,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Strategic layer: mode=fast, avoid congestion=True, avoid flood-prone=False.",
+            "Tactical layer: allowed routes A, B, C, fastest of them is A.",
+            "Operational layer: limit speed to 18 km/h on bad patches, stop at red signals, keep the food box level."
+          ]
+        },
+        {
+          "test": 2,
+          "route": "B",
+          "minutes": 10.4,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Strategic layer: mode=fast, avoid congestion=True, avoid flood-prone=False.",
+            "Tactical layer: allowed routes B, C, fastest of them is B.",
+            "Operational layer: limit speed to 19 km/h on bad patches, stop at red signals, keep the food box level."
+          ]
+        },
+        {
+          "test": 3,
+          "route": "C",
+          "minutes": 14.4,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Strategic layer: mode=safe, avoid congestion=True, avoid flood-prone=True.",
+            "Tactical layer: allowed routes C, fastest of them is C.",
+            "Operational layer: limit speed to 14 km/h on bad patches, stop at red signals, keep the food box level."
+          ]
+        }
+      ],
+      "on_time": 3,
+      "total_minutes": 34.8
+    },
+    {
+      "agent": "Contextual",
+      "key": "contextual",
+      "tests": [
+        {
+          "test": 1,
+          "route": "A",
+          "minutes": 10.0,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Context: normal (time 13:00, weather clear).",
+            "Policy for normal: preference A > B > C.",
+            "First open route in the policy -> A."
+          ]
+        },
+        {
+          "test": 2,
+          "route": "B",
+          "minutes": 10.4,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Context: rush hour (time 18:10, weather clear).",
+            "Policy for rush hour: preference B > C > A.",
+            "First open route in the policy -> B."
+          ]
+        },
+        {
+          "test": 3,
+          "route": "C",
+          "minutes": 14.4,
+          "on_time": true,
+          "note": "smooth ride",
+          "reasoning": [
+            "Context: monsoon (time 13:00, weather rain).",
+            "Policy for monsoon: preference C > A > B.",
+            "First open route in the policy -> C."
+          ]
+        }
+      ],
+      "on_time": 3,
+      "total_minutes": 34.8
+    }
+  ]
+}
