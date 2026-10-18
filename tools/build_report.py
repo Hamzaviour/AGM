@@ -38,7 +38,7 @@ ROOT = os.path.join(HERE, "..")
 sys.path.insert(0, os.path.join(ROOT, "code"))
 import agents as agents_module  # noqa: E402
 from environment import (DEADLINE_MIN, ROUTES, ROUTE_IDS, SCENARIOS,  # noqa: E402
-                         base_minutes, execute, make_percept, route_km)
+                         base_minutes, make_percept, route_km)
 
 PINK = RGBColor(0xE2, 0x1B, 0x70)
 DIAG = os.path.join(ROOT, "diagrams")
@@ -117,33 +117,15 @@ def code(doc, text, size=8.5):
     p._p.get_or_add_pPr().append(shd)
 
 
-def run_snippet(cls, k):
-    """Python that runs one agent in one test situation, followed by its real output."""
-    sc = SCENARIOS[k]
-    agent = cls()
-    agent.reset()
-    route, why = agent.decide(make_percept(sc))
-    outcome = execute(route, sc)
-    lines = [
-        "# Test %d: %s" % (sc["id"], sc["title"]),
-        "scenario = SCENARIOS[%d]" % k,
-        "agent = %s()" % cls.__name__,
-        "route, why = agent.decide(make_percept(scenario))",
-        "outcome = execute(route, scenario)",
-        "",
-        "# output",
-        ">>> route",
-        repr(route),
-        ">>> print(*why, sep='\\n')",
-    ] + why + [">>> outcome", repr(outcome)]
-    return "\n".join(lines)
-
-
 def title_page(doc):
     for _ in range(3):
         doc.add_paragraph()
     p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r = p.add_run("University of Central Punjab"); r.font.size = Pt(16); r.bold = True
+    logo = os.path.join(OUT_DIR, "assets", "ucp_logo.png")
+    if os.path.exists(logo):
+        doc.add_picture(logo, width=Cm(4.5))
+        doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
     p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.add_run("%s, %s" % (TITLE_INFO["course"], TITLE_INFO["assignment"])).font.size = Pt(13)
     doc.add_paragraph()
@@ -307,17 +289,7 @@ def build():
         doc.add_paragraph("The complete class from code/agents.py:")
         code(doc, inspect.getsource(cls), size=7.5)
 
-        doc.add_heading("Behaviour in each situation", 3)
-        doc.add_paragraph("Each snippet runs the agent on one test situation and shows its real output "
-                          "(decision, reasoning and the delivery result from the environment).")
-        for k in range(len(SCENARIOS)):
-            t = agents[key]["tests"][k]
-            p = doc.add_paragraph()
-            p.add_run("Test %d, %s: " % (SCENARIOS[k]["id"], SCENARIOS[k]["title"])).bold = True
-            r = p.add_run("route %s, %.1f min, %s." % (t["route"], t["minutes"],
-                          "on time" if t["on_time"] else "LATE by %.1f min" % (t["minutes"] - DEADLINE_MIN)))
-            r.font.color.rgb = RGBColor(0x0C, 0x83, 0x0C) if t["on_time"] else RGBColor(0xD0, 0x3B, 0x3B)
-            code(doc, run_snippet(cls, k), size=7.5)
+        doc.add_heading("Reasoning in each situation", 3)
         figure(doc, "trace_%s.png" % key,
                "Figure: %s agent, reasoning trace in the three situations (percept, every reasoning step, "
                "decision, outcome)." % name, width=16.5)
